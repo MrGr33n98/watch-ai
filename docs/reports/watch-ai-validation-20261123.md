@@ -933,28 +933,48 @@ then failed in `Install Android 17 preview SDK` before Gradle with
 `Warning: Failed to find package 'platforms;android-37'` (exit 1). Backend CI
 run `45374977116` and Security Scans run `45374978032` both passed.
 
-Because the API 37 SDK package was unavailable to the runner, the current
-configuration returns to stable API 36 and pins Compose to the last 1.11 line:
-Compose BOM `2026.06.01` (Compose 1.11.4) and Wear Compose `1.6.2`, keeping
-`targetSdk = 36`. The official [Compose compiler/dependency setup](https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler)
-states Compose 1.12 requires `compileSdk 37`; the [Compose BOM mapping](https://developer.android.com/develop/ui/compose/bom/bom-mapping)
-maps `2026.06.01` to 1.11.4, and the [Wear Compose release notes](https://developer.android.com/jetpack/androidx/releases/wear-compose)
-list 1.6.2 as a stable release.
+The API 37 attempt used the deprecated `sdkmanager` command and failed to find
+`platforms;android-37`. The official Wear Compose M3 skill requires the latest
+stable Material3 library and `compileSdk >= 37` for version 1.7.x, and explicitly
+prohibits downgrading to work around API errors. Its [official skill guidance](https://developer.android.com/agents/skills/wear/wear-compose-m3/skill)
+also directs use of canonical samples. The official [`android sdk install` CLI](https://developer.android.com/tools/agents/android-cli/commands/sdk_install)
+replaces deprecated `sdkmanager` and supports canary package installation, so
+the workflow now uses `android sdk install --canary platforms/android-37
+build-tools/37.0.0` with Wear Compose 1.7.2, Compose BOM 2026.09.00, AGP 9.5,
+`compileSdk = 37`, and `targetSdk = 36`.
 
-**TDD evidence for the stable configuration** — first ran
-`uv run pytest -q tests/contract/test_ci_workflows.py::test_wear_ci_uses_stable_compose_versions_compatible_with_api_36`
-against the API 37/Compose 1.12 setup: RED, `1 failed in 0.81s`, at the
-`compileSdk = 36` assertion. After pinning the stable API 36-compatible line,
-ran `uv run pytest -q tests/contract/test_ci_workflows.py tests/contract/test_deployment_artifact.py`
-→ `4 passed in 0.49s`; `uv run ruff check tests/contract/test_ci_workflows.py tests/contract/test_deployment_artifact.py`
-→ `All checks passed!`. The new stable version set has not yet run on GitHub;
-Gradle compilation, unit tests, Android-test compilation, and APK upload remain
-unverified.
+The follow-up run (`45376357242`, commit `00756512e86f9c5fda47e3fb8fa14372a7654b7e`)
+used Wear Compose 1.6.2 temporarily because the old CLI could not install API
+37. AAR validation passed, then Kotlin compilation failed with API mismatches:
+`PairingScreen` referenced missing `ColorScheme.surface`; `QuestionListScreen` and
+`WearComponents` attempted to construct the `SurfaceTransformation` interface;
+`wearListItemModifier` invoked a composable default outside a composable
+function. These errors were specific to the temporary 1.6.2 version.
 
-**T038 status**: partial. Backend CI and both Security Scans passed for commits
-through `36fed30`; that Wear run failed during preview SDK installation. The
-stable API 36 configuration now passes local workflow contracts, and its GitHub
-run is pending. No real WAHA/OpenRouter credentials were used.
+The current source follows the 1.7.x APIs: input background uses the Wear
+`ColorScheme.background`; helper components call
+`itemScope.SurfaceTransformation(transformationSpec)`; and
+`wearListItemModifier` is marked `@Composable`. These changes follow the
+official [ListHeader sample](https://developer.android.com/agents/skills/wear/wear-compose-m3/references/material3/ListHeaderSample.kt),
+[Scaffold sample](https://developer.android.com/agents/skills/wear/wear-compose-m3/references/material3/ScaffoldSample.kt),
+and [SurfaceTransformation sample](https://developer.android.com/agents/skills/wear/wear-compose-m3/references/material3/SurfaceTransformationSample.kt).
+
+**TDD evidence for the current toolchain requirement** — the new workflow
+contract initially reported RED (`1 failed in 0.58s`) at `compileSdk = 37`.
+After updating the app/workflow to 1.7.2/API 37 with Android CLI canary, the
+final run `uv run pytest -q tests/contract/test_ci_workflows.py` reported
+`3 passed in 0.50s`; Ruff reported `All checks passed!`. An intermediate test
+assertion used semicolon package paths for the new CLI's slash paths; the
+assertion was corrected before the final green run. The current configuration
+and Kotlin source fixes have not yet run on GitHub; SDK install, Gradle sync,
+JVM tests, Android-test compilation, and APK upload remain unverified.
+
+**T038 status**: partial. Backend CI run `45376357705` and Security Scans run
+`45376357364` passed for commit `0075651`; Wear run `45376357242` failed in
+Kotlin compilation under the temporary 1.6.2 configuration. The current
+skill-compliant API 37/Compose 1.7.2 configuration passes local workflow
+contracts, and its GitHub run is pending. No real WAHA/OpenRouter credentials
+were used.
 
 ### T039 — Performance, accessibility, offline, and regression coverage
 
@@ -1034,10 +1054,12 @@ report now state that limitation; an owner/admin revocation workflow must be
 implemented before a production launch. Do not treat self-revocation as lost
 device recovery.
 
-No debug APK, screenshot, APK hash, Android build, or instrumented Wear test is
-available because Java/Gradle/Android SDK tooling is missing. The Docker image
-build also stalled at final export and was interrupted; it does not qualify as
-a build pass. No physical hardware or live WAHA/OpenRouter credentials were
+No debug APK, screenshot, APK hash, or instrumented Wear test is available. The
+latest Wear CI attempt reached Kotlin compilation under a temporary dependency
+version and failed; the current skill-compliant configuration has not yet been
+built. The Docker image build also stalled at final export and was interrupted;
+it does not qualify as a build pass. No physical hardware or live
+WAHA/OpenRouter credentials were
 available/used, and no deployment, database backup/restore, retention purge,
 merge, or production action was performed. The 16 PostgreSQL tests remain
 skipped pending an explicitly disposable test database.
@@ -1045,10 +1067,10 @@ skipped pending an explicitly disposable test database.
 The latest backend regression evidence remains `122 passed, 16 skipped, 1
 warning`; Ruff, mypy, Compose config, and pack validation passed. For draft PR
 [#1](https://github.com/MrGr33n98/watch-ai/pull/1), Backend CI and Security
-Scans passed on `36fed30`; Wear CI failed because `platforms;android-37` could
-not be installed through sdkmanager. The stable API 36/Compose 1.11.4/Wear
-Compose 1.6.2 configuration passes local contracts; its GitHub run is pending.
-No APK or screenshots were produced by the failed CI run. The draft remains a
-review handoff, not release readiness. T041 remains partial; device-loss
-revocation, PostgreSQL integration, and live-provider checks also remain
-pending regardless of PR status. No merge or deployment was performed.
+Scans passed on `0075651`; Wear CI failed during Kotlin compilation under the
+temporary 1.6.2 library selection. The skill-compliant Wear Compose 1.7.2/API
+37 configuration and source fixes pass local workflow contracts; a new GitHub
+run is pending. No APK or screenshots were produced. The draft remains a review
+handoff, not release readiness. T041 remains partial; device-loss revocation,
+PostgreSQL integration, and live-provider checks also remain pending regardless
+of PR status. No merge or deployment was performed.

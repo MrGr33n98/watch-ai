@@ -49,7 +49,7 @@ PostgreSQL não foi configurado, portanto os 16 testes que requerem
 | P1 | WAHA e OpenRouter reais não validados. | T033/T034 dependem de sessão WAHA DEV isolada, credenciais e orçamento explicitamente aprovados. |
 | P1 | Deploy público não fornecido pelo repositório. | Compose é loopback-only e não configura TLS ingress, secret manager, backups off-host nem scheduler. |
 | P2 | Limite de gasto não reserva custo para chamadas concorrentes. | `MONTHLY_MODEL_BUDGET_USD` tem preflight/persistência, mas chamadas já em voo podem ultrapassar o limite. |
-| P1 | CI Wear ainda não passou. | No commit `36fed30`, Backend CI e Security Scans passaram. A tentativa de instalar API 37 pelo canal canary falhou porque o runner não encontrou `platforms;android-37`. O app voltou a API 36 e usa Compose BOM 2026.06.01/Wear Compose 1.6.2; o próximo run ainda está pendente. |
+| P1 | CI Wear ainda não passou. | No commit `0075651`, API 36 setup passou, mas a compilação Kotlin falhou após uma tentativa temporária com Wear Compose 1.6.2. A skill Android oficial requer o estável 1.7.2 e compileSdk 37; o app voltou a essa combinação e o workflow usa Android CLI canary para instalar API 37. Novo run pendente. |
 
 ## Itens da missão ainda pendentes
 

@@ -47,7 +47,7 @@ internal fun WearActionButton(
         enabled = enabled,
         modifier = itemScope.wearListItemModifier(transformationSpec)
             .semantics { contentDescription = description },
-        transformation = SurfaceTransformation(transformationSpec),
+        transformation = itemScope.SurfaceTransformation(transformationSpec),
         label = { Text(label) },
     )
 }

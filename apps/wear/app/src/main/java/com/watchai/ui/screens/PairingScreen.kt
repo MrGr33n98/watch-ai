@@ -116,7 +116,7 @@ private fun InputBox(
         modifier = Modifier
             .then(itemScope.wearListItemModifier(transformationSpec))
             .heightIn(min = 52.dp)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.background)
             .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large)
             .padding(horizontal = 10.dp, vertical = 12.dp),
         contentAlignment = Alignment.CenterStart,

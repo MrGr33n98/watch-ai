@@ -83,7 +83,7 @@ private fun QuestionButton(
             contentDescription = listOfNotNull(question.label, question.title ?: status, question.resultPreview)
                 .joinToString(", ")
         },
-        transformation = SurfaceTransformation(transformationSpec),
+        transformation = itemScope.SurfaceTransformation(transformationSpec),
         label = { Text(question.label) },
         secondaryLabel = { Text(question.title ?: status) },
     )

@@ -53,17 +53,18 @@ def test_ci_workflows_cover_backend_wear_and_security_without_provider_secrets()
     assert "WAHA_API_KEY" not in security
 
 
-def test_wear_ci_uses_stable_compose_versions_compatible_with_api_36() -> None:
+def test_wear_ci_uses_latest_stable_material3_and_preview_sdk_cli() -> None:
     app_gradle = (REPOSITORY_ROOT / "apps" / "wear" / "app" / "build.gradle.kts").read_text(
         encoding="utf-8"
     )
     wear_workflow = (WORKFLOW_DIRECTORY / "wear-ci.yml").read_text(encoding="utf-8")
 
-    assert "compileSdk = 36" in app_gradle
-    assert 'platforms;android-36 build-tools;36.0.0' in wear_workflow
-    assert "compose-bom:2026.06.01" in app_gradle
-    assert "androidx.wear.compose:compose-material3:1.6.2" in app_gradle
-    assert "androidx.wear.compose:compose-foundation:1.6.2" in app_gradle
+    assert "compileSdk = 37" in app_gradle
+    assert "platforms/android-37 build-tools/37.0.0" in wear_workflow
+    assert "compose-bom:2026.09.00" in app_gradle
+    assert "androidx.wear.compose:compose-material3:1.7.2" in app_gradle
+    assert "androidx.wear.compose:compose-foundation:1.7.2" in app_gradle
+    assert 'android sdk install --canary platforms/android-37 build-tools/37.0.0' in wear_workflow
     assert "sdkmanager --channel" not in wear_workflow
 
 

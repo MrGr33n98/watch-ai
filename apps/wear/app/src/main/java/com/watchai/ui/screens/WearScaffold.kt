@@ -44,6 +44,7 @@ internal fun WearScreenScaffold(
 }
 
 /** Applies the default Wear list touch spacing and curved-screen transformation. */
+@Composable
 internal fun TransformingLazyColumnItemScope.wearListItemModifier(
     transformationSpec: TransformationSpec,
     minimumVerticalPadding: Dp = ButtonDefaults.minimumVerticalListContentPadding,
