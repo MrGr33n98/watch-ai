@@ -113,6 +113,7 @@ internal class SharedPreferencesWatchStore(context: Context) : WatchPreferencesS
     }
 }
 
+class WatchController {
     constructor(context: Context) : this(
         preferences = SharedPreferencesWatchStore(context),
         credentialStore = AndroidKeystoreCredentialStore(context),
