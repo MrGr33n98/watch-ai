@@ -7,8 +7,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.getValue
@@ -18,6 +20,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Density
@@ -29,6 +32,9 @@ import com.watchai.domain.QuestionStatus
 import com.watchai.domain.SolutionStep
 import com.watchai.ui.screens.QuestionStepsScreen
 import com.watchai.ui.screens.WatchAiWearRoot
+import android.graphics.Bitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -142,6 +148,24 @@ class QuestionStepsScreenTest {
         }
 
         composeRule.onNodeWithText("Offline · conteúdo salvo").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `captures synthetic solution screenshot for CI review`() {
+        composeRule.setContent {
+            WatchAiWearRoot {
+                QuestionStepsScreen(sampleQuestion(), 0, offline = false, onPrevious = {}, onNext = {}, onBack = {})
+            }
+        }
+        composeRule.waitForIdle()
+
+        val screenshot = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        val output = InstrumentationRegistry.getInstrumentation().targetContext.filesDir
+        val file = File(output, "watch-ai-question-detail.png")
+        file.outputStream().use { stream ->
+            assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream))
+        }
+        assertTrue("Screenshot was not written", file.isFile && file.length() > 0)
     }
 
     @Test

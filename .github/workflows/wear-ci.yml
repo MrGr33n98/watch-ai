@@ -56,10 +56,40 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Run Wear UI tests on a round emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: android-wear
+          arch: x86_64
+          profile: wearos_small_round
+          emulator-boot-timeout: 900
+          disable-animations: true
+          working-directory: apps/wear
+          script: |
+            gradle --no-daemon :app:connectedDebugAndroidTest
+            mkdir -p build/screenshots
+            adb exec-out run-as com.watchai cat files/watch-ai-question-detail.png > build/screenshots/watch-ai-question-detail.png
+            sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/app-debug.apk.sha256
+            sha256sum build/screenshots/watch-ai-question-detail.png > build/screenshots/watch-ai-question-detail.png.sha256
+
+      - name: Upload Wear UI test reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: watch-ai-wear-ui-validation
+          path: |
+            apps/wear/app/build/reports/androidTests/connected/
+            apps/wear/build/screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: watch-ai-wear-debug
-          path: apps/wear/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            apps/wear/app/build/outputs/apk/debug/app-debug.apk
+            apps/wear/app/build/outputs/apk/debug/app-debug.apk.sha256
           if-no-files-found: error
           retention-days: 14
