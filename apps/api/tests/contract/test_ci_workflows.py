@@ -61,3 +61,16 @@ def test_wear_ci_installs_the_stable_sdk_selected_by_the_app() -> None:
 
     assert "compileSdk = 36" in app_gradle
     assert 'platforms;android-36 build-tools;36.0.0' in wear_workflow
+
+
+def test_agp_9_uses_builtin_kotlin_and_the_compose_compiler_plugin() -> None:
+    root_gradle = (REPOSITORY_ROOT / "apps" / "wear" / "build.gradle.kts").read_text(
+        encoding="utf-8"
+    )
+    app_gradle = (REPOSITORY_ROOT / "apps" / "wear" / "app" / "build.gradle.kts").read_text(
+        encoding="utf-8"
+    )
+
+    assert "org.jetbrains.kotlin.android" not in root_gradle + app_gradle
+    assert "kotlinOptions" not in app_gradle
+    assert 'id("org.jetbrains.kotlin.plugin.compose")' in app_gradle

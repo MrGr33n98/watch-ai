@@ -861,7 +861,7 @@ Observed: `119 passed, 16 skipped, 1 warning in 168.65s`; skipped tests require 
 
 **RED** — added `apps/api/tests/contract/test_ci_workflows.py` first. It failed because `.github/workflows/` did not exist. After adding the three workflow files, two further runs exposed test-harness regex mistakes for SHA-pinned action paths; those were corrected. The final contract checks YAML parsing, triggers, read-only token permissions, 40-character action SHA pins, required backend/Wear steps, and the dependency/secret scan commands.
 
-Added `backend-ci.yml` for locked Python setup, API tests plus coverage, Ruff, mypy, and a 14-day coverage artifact; `wear-ci.yml` provisions JDK 17, Android API 37, Gradle 9.6.0, runs Wear JVM tests/builds the debug APK and uploads it; `security.yml` scans repository history with Gitleaks and audits the exported, hash-pinned Python dependency set with pip-audit. The workflows use read-only repository permissions and no OpenRouter or WAHA credentials. Third-party actions are pinned to reviewed commit SHAs. CI uses a GitHub-provided read token only for Gitleaks API reads; PR comments and SARIF upload are disabled.
+Added `backend-ci.yml` for locked Python setup, API tests plus coverage, Ruff, mypy, and a 14-day coverage artifact; `wear-ci.yml` provisions JDK 17, Android API 36, Gradle 9.6.0, runs Wear JVM tests, compiles Android test Kotlin sources, builds the debug APK, and uploads it; `security.yml` scans repository history with Gitleaks and audits the exported, hash-pinned Python dependency set with pip-audit. The workflows use read-only repository permissions and no OpenRouter or WAHA credentials. Third-party actions are pinned to reviewed commit SHAs. CI uses a GitHub-provided read token only for Gitleaks API reads; PR comments and SARIF upload are disabled.
 
 The first local dependency audit found 42 advisory IDs affecting the locked Pillow `12.3.0` package, all listing `13.0.0` as the fix. Updated the API constraint to `pillow>=13,<14` and lock to `13.0.0`. This was a security finding discovered while validating the workflow and is included in this slice.
 
@@ -886,7 +886,14 @@ uv pip install --python .venv/bin/python pip-audit
 .venv/bin/pip-audit --strict --disable-pip --require-hashes --requirement /tmp/watch-ai-requirements.txt
 ```
 
-Observed: `No known vulnerabilities found`. The CI job's `setup-python` installs a regular Python distribution and runs the equivalent `uvx` scanner command; the workflow itself was not triggered on GitHub from this workspace.
+Observed: `No known vulnerabilities found`. GitHub Actions on PR #1 subsequently
+passed Backend CI and both Security Scans jobs, including Gitleaks and
+`pip-audit` (runs `45363573729` and `45363573709`). The first Wear run failed
+before Gradle because SDK Manager could not find API 37. Follow-up run
+`45365440891` successfully installed API 36, JDK 17, and Gradle 9.6, then failed
+because AGP 9 rejects `org.jetbrains.kotlin.android`. The codebase now removes
+that legacy plugin and `kotlinOptions`, keeping the Compose compiler plugin.
+This follows the [official AGP built-in Kotlin migration](https://developer.android.com/build/migrate-to-built-in-kotlin).
 
 **T038 status at first PR run**: partial. GitHub Actions for commit
 `6d2b74ff2b1c977676d4ce5c4916296908ab95a1` completed Backend CI successfully,
@@ -895,8 +902,16 @@ jobs passed: Gitleaks history scan and `pip-audit`. Wear OS CI failed in SDK
 setup before invoking Gradle because `sdkmanager` reported that
 `platforms;android-37` was not found. The Android platform release list
 documents Android 16/API 36; the app/workflow have been changed to API 36, and
-the workflow now also compiles `androidTest` Kotlin sources. The corrected
-GitHub run is pending. No real provider credentials were used.
+the workflow now also compiles `androidTest` Kotlin sources. No real provider
+credentials were used.
+
+The next run (`45365440891`, commit `ed4c5a1ffe3a20db6ddabd3ffd534118e20316cc`)
+installed API 36 successfully but failed before compilation because AGP 9.5
+rejects the legacy Kotlin Android plugin. The app/build files now remove that
+plugin and the legacy `kotlinOptions` DSL, while retaining the Compose compiler
+plugin. A contract test recorded RED before the change (`1 failed in 0.39s`)
+and GREEN after it (`3 passed in 0.26s`). A subsequent GitHub Wear run is
+pending; API 36 follows [Android SDK platform release notes](https://developer.android.com/tools/releases/platforms).
 
 ### T039 — Performance, accessibility, offline, and regression coverage
 
@@ -987,10 +1002,10 @@ skipped pending an explicitly disposable test database.
 The latest backend regression evidence remains `122 passed, 16 skipped, 1
 warning`; Ruff, mypy, Compose config, and pack validation passed. The first CI
 run for draft PR [#1](https://github.com/MrGr33n98/watch-ai/pull/1) passed
-Backend CI and Security Scans. Wear CI failed before Gradle because API 37 was
-unavailable in the SDK repository; this branch now targets API 36, and the
-corrected run is pending. The draft remains a review handoff, not release
-readiness. T041 remains partial because no APK/screenshots exist to attach and
-Android execution is unavailable locally; device-loss revocation, PostgreSQL
-integration, and live-provider checks also remain pending regardless of PR
-status. No merge or deployment was performed.
+Backend CI and Security Scans. Wear CI first failed because API 37 was
+unavailable; a subsequent attempt installed API 36 successfully but failed at
+AGP's built-in Kotlin migration. That build configuration is now corrected and
+another Wear run is pending. The draft remains a review handoff, not release
+readiness. T041 remains partial because no APK/screenshots exist to attach;
+device-loss revocation, PostgreSQL integration, and live-provider checks also
+remain pending regardless of PR status. No merge or deployment was performed.

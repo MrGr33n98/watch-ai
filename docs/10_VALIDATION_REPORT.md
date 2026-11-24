@@ -48,7 +48,7 @@ PostgreSQL não foi configurado, portanto os 16 testes que requerem
 | P1 | WAHA e OpenRouter reais não validados. | T033/T034 dependem de sessão WAHA DEV isolada, credenciais e orçamento explicitamente aprovados. |
 | P1 | Deploy público não fornecido pelo repositório. | Compose é loopback-only e não configura TLS ingress, secret manager, backups off-host nem scheduler. |
 | P2 | Limite de gasto não reserva custo para chamadas concorrentes. | `MONTHLY_MODEL_BUDGET_USD` tem preflight/persistência, mas chamadas já em voo podem ultrapassar o limite. |
-| P1 | CI Wear ainda não passou. | Backend CI, pip-audit e Gitleaks passaram no primeiro PR run. Wear falhou antes do Gradle porque o SDK Manager não encontrou API 37; o branch agora usa API 36 e aguarda nova execução. |
+| P1 | CI Wear ainda não passou. | Backend CI, pip-audit e Gitleaks passaram. API 36 setup passou; Gradle encontrou incompatibilidade entre AGP 9 e o plugin Kotlin Android legado. Migração para Kotlin integrado foi feita e aguarda novo run. |
 
 ## Itens da missão ainda pendentes
 
