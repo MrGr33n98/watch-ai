@@ -47,6 +47,15 @@ jobs:
       - name: Run Wear JVM tests and assemble debug APK
         run: gradle --no-daemon :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebug
 
+      - name: Upload Wear JVM test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: watch-ai-wear-test-reports
+          path: apps/wear/app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

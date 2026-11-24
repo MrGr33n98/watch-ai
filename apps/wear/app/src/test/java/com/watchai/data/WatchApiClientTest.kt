@@ -127,8 +127,5 @@ class WatchApiClientTest {
     }
 
     private fun response(code: Int = 200, body: String = "") =
-        MockResponse.Builder()
-            .code(code)
-            .body(body)
-            .build()
+        MockResponse(code = code, body = body)
 }
