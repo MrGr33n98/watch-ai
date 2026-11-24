@@ -3,13 +3,13 @@ package com.watchai.ui
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
@@ -72,13 +72,13 @@ class QuestionStepsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Enunciado").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Passo 1 de 2").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Próximo passo").performScrollTo().performClick()
-        composeRule.onNodeWithText("Passo 2 de 2").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Fórmula").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Passo anterior").performScrollTo().performClick()
-        composeRule.onNodeWithText("Enunciado").performScrollTo().assertIsDisplayed()
+        composeRule.scrollToDisplayed(hasText("Enunciado"))
+        composeRule.scrollToDisplayed(hasText("Passo 1 de 2"))
+        composeRule.scrollToDisplayed(hasContentDescription("Próximo passo")).performClick()
+        composeRule.scrollToDisplayed(hasText("Passo 2 de 2"))
+        composeRule.scrollToDisplayed(hasText("Fórmula"))
+        composeRule.scrollToDisplayed(hasContentDescription("Passo anterior")).performClick()
+        composeRule.scrollToDisplayed(hasText("Enunciado"))
     }
 
     @Test
@@ -99,8 +99,8 @@ class QuestionStepsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Precisa de revisão").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Resultado não verificado").performScrollTo().assertIsDisplayed()
+        composeRule.scrollToDisplayed(hasText("Precisa de revisão"))
+        composeRule.scrollToDisplayed(hasText("Resultado não verificado"))
     }
 
     @Test
@@ -121,7 +121,7 @@ class QuestionStepsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Precisa de revisão").performScrollTo().assertIsDisplayed()
+        composeRule.scrollToDisplayed(hasText("Precisa de revisão"))
         composeRule.onNodeWithText("42").assertDoesNotExist()
     }
 
@@ -134,9 +134,9 @@ class QuestionStepsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Calcule 2 + 2.").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Passo anterior").performScrollTo().assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription("Próximo passo").performScrollTo().assertIsEnabled()
+        composeRule.scrollToDisplayed(hasContentDescription("Calcule 2 + 2."))
+        composeRule.scrollToDisplayed(hasContentDescription("Passo anterior")).assertIsNotEnabled()
+        composeRule.scrollToDisplayed(hasContentDescription("Próximo passo")).assertIsEnabled()
     }
 
     @Test
@@ -147,7 +147,7 @@ class QuestionStepsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Offline · conteúdo salvo").performScrollTo().assertIsDisplayed()
+        composeRule.scrollToDisplayed(hasText("Offline · conteúdo salvo"))
     }
 
     @Test
@@ -211,13 +211,10 @@ class QuestionStepsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Problema").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Próximo passo").performScrollTo().assertIsDisplayed()
+        composeRule.scrollToDisplayed(hasContentDescription("Problema"))
+        val control = composeRule.scrollToDisplayed(hasContentDescription("Próximo passo"))
         val displayBounds = composeRule.onNodeWithTag("round-display").fetchSemanticsNode().boundsInRoot
-        val controlBounds = composeRule
-            .onNodeWithContentDescription("Próximo passo")
-            .fetchSemanticsNode()
-            .boundsInRoot
+        val controlBounds = control.fetchSemanticsNode().boundsInRoot
         assertTrue("Navigation control clipped at $displayDiameter/$fontScale", controlBounds.left >= displayBounds.left)
         assertTrue("Navigation control clipped at $displayDiameter/$fontScale", controlBounds.right <= displayBounds.right)
     }

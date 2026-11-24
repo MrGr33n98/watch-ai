@@ -61,6 +61,7 @@ fun PairingScreen(
                 color = MaterialTheme.colorScheme.secondary,
                 style = MaterialTheme.typography.titleSmall,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Start,
+                accessibilityText = "Seção Endereço HTTPS",
             )
         }
         item(key = "endpoint-input", contentType = "input") {
@@ -82,6 +83,7 @@ fun PairingScreen(
                 color = MaterialTheme.colorScheme.secondary,
                 style = MaterialTheme.typography.titleSmall,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Start,
+                accessibilityText = "Seção Código temporário",
             )
         }
         item(key = "code-input", contentType = "input") {

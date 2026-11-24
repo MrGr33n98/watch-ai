@@ -1,11 +1,9 @@
 package com.watchai.ui
 
-import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import com.watchai.domain.QuestionCard
 import com.watchai.domain.QuestionStatus
 import com.watchai.domain.SessionStatus
@@ -44,10 +42,9 @@ class SessionListScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("4/4 exercícios").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Pronta").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Abrir sessão, 4 de 4 exercícios")
-            .performScrollTo()
+        composeRule.scrollToDisplayed(hasText("4/4 exercícios"))
+        composeRule.scrollToDisplayed(hasText("Pronta"))
+        composeRule.scrollToDisplayed(hasContentDescription("Abrir sessão, 4 de 4 exercícios"))
             .performClick()
         composeRule.runOnIdle { assertEquals("session-1", selectedSession) }
     }
@@ -77,8 +74,8 @@ class SessionListScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Excluir sessão").performScrollTo().performClick()
-        composeRule.onNodeWithText("Confirmar exclusão").performScrollTo().performClick()
+        composeRule.scrollToDisplayed(hasText("Excluir sessão")).performClick()
+        composeRule.scrollToDisplayed(hasText("Confirmar exclusão")).performClick()
         composeRule.runOnIdle { assertEquals(sessionId, deletedSession) }
     }
 
@@ -96,7 +93,7 @@ class SessionListScreenTest {
         }
 
         listOf("Q1", "Q2", "Q3", "Q4").forEach {
-            composeRule.onNodeWithText(it).performScrollTo().assertIsDisplayed()
+            composeRule.scrollToDisplayed(hasText(it))
         }
     }
 
@@ -114,9 +111,9 @@ class SessionListScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Offline · dados sincronizados").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Nenhuma sessão sincronizada").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Parear relógio").performScrollTo().assertIsDisplayed()
+        composeRule.scrollToDisplayed(hasText("Offline · dados sincronizados"))
+        composeRule.scrollToDisplayed(hasText("Nenhuma sessão sincronizada"))
+        composeRule.scrollToDisplayed(hasText("Parear relógio"))
     }
 
     @Test
@@ -141,7 +138,7 @@ class SessionListScreenTest {
         }
 
         listOf("Processando", "Pronta", "Parcial", "Precisa de revisão").forEach {
-            composeRule.onNodeWithText(it).performScrollTo().assertIsDisplayed()
+            composeRule.scrollToDisplayed(hasText(it))
         }
     }
 }

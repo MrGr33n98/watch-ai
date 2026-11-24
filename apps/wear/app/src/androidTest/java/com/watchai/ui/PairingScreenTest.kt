@@ -2,10 +2,9 @@ package com.watchai.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import com.watchai.ui.screens.PairingScreen
 import com.watchai.ui.screens.WatchAiWearRoot
 import org.junit.Assert.assertTrue
@@ -33,10 +32,9 @@ class PairingScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Endereço HTTPS").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Código temporário").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Parear relógio")
-            .performScrollTo()
+        composeRule.scrollToDisplayed(hasContentDescription("Endereço HTTPS")).assertIsDisplayed()
+        composeRule.scrollToDisplayed(hasContentDescription("Código temporário")).assertIsDisplayed()
+        composeRule.scrollToDisplayed(hasContentDescription("Parear relógio"))
             .assertIsEnabled()
             .performClick()
         composeRule.runOnIdle { assertTrue(paired) }

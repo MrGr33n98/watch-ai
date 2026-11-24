@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnItemScope
@@ -34,7 +35,7 @@ internal fun WearScreenScaffold(
     val transformationSpec = rememberTransformationSpec()
     ScreenScaffold(scrollState = scrollState) { contentPadding ->
         TransformingLazyColumn(
-            modifier = modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize().testTag("wear-screen-list"),
             state = scrollState,
             contentPadding = contentPadding,
         ) {
