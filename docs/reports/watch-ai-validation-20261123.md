@@ -907,11 +907,38 @@ credentials were used.
 
 The next run (`45365440891`, commit `ed4c5a1ffe3a20db6ddabd3ffd534118e20316cc`)
 installed API 36 successfully but failed before compilation because AGP 9.5
-rejects the legacy Kotlin Android plugin. The app/build files now remove that
+rejects the legacy Kotlin Android plugin. The app/build files removed that
 plugin and the legacy `kotlinOptions` DSL, while retaining the Compose compiler
 plugin. A contract test recorded RED before the change (`1 failed in 0.39s`)
-and GREEN after it (`3 passed in 0.26s`). A subsequent GitHub Wear run is
-pending; API 36 follows [Android SDK platform release notes](https://developer.android.com/tools/releases/platforms).
+and GREEN after it (`3 passed in 0.26s`).
+
+The next Wear run (`45367334579`, commit
+`2038fd72e86687ec470f2006b1acc4e83b32e7c4`) passed SDK/JDK/Gradle setup and
+reached Gradle, then failed at `:app:checkDebugAarMetadata`. The exact diagnostic
+was that `androidx.wear.compose:compose-material:1.7.2` requires compile API 37
+or later, while the app used API 36; the metadata check reported 17 issues.
+The app now uses `compileSdk = 37` and the Wear workflow installs
+`platforms;android-37` and `build-tools;37.0.0` with
+`sdkmanager --channel=3`. This keeps `targetSdk = 36`, so Android 17 runtime
+behavior is not opted into. Android's [Android 17 SDK setup](https://developer.android.com/about/versions/17/setup-sdk)
+identifies API 37 as a preview platform and directs developers to install its
+SDK platform/build tools; the official [`sdkmanager` documentation](https://developer.android.com/tools/sdkmanager)
+documents channel selection.
+
+**TDD evidence for this correction** — first ran
+`uv run pytest -q tests/contract/test_ci_workflows.py::test_wear_ci_installs_api_37_preview_required_by_wear_compose`
+against the API 36 configuration: RED, `1 failed in 0.72s`, with the failure
+at `compileSdk = 37`. After updating the app and workflow, ran
+`uv run pytest -q tests/contract/test_ci_workflows.py` → `3 passed in 0.82s`
+and `uv run ruff check tests/contract/test_ci_workflows.py` → `All checks passed!`.
+The changed workflow has not yet run on GitHub; its SDK package availability,
+Gradle compilation, unit tests, Android-test compilation, and APK upload remain
+unverified.
+
+**T038 status**: partial. Backend CI and both Security Scans passed for commit
+`2038fd7`; Wear CI failed at dependency metadata as described above. The local
+SDK/workflow contract is green, but the fix is not yet verified by GitHub CI.
+No real WAHA/OpenRouter credentials were used.
 
 ### T039 — Performance, accessibility, offline, and regression coverage
 
@@ -1000,12 +1027,12 @@ merge, or production action was performed. The 16 PostgreSQL tests remain
 skipped pending an explicitly disposable test database.
 
 The latest backend regression evidence remains `122 passed, 16 skipped, 1
-warning`; Ruff, mypy, Compose config, and pack validation passed. The first CI
-run for draft PR [#1](https://github.com/MrGr33n98/watch-ai/pull/1) passed
-Backend CI and Security Scans. Wear CI first failed because API 37 was
-unavailable; a subsequent attempt installed API 36 successfully but failed at
-AGP's built-in Kotlin migration. That build configuration is now corrected and
-another Wear run is pending. The draft remains a review handoff, not release
-readiness. T041 remains partial because no APK/screenshots exist to attach;
-device-loss revocation, PostgreSQL integration, and live-provider checks also
-remain pending regardless of PR status. No merge or deployment was performed.
+warning`; Ruff, mypy, Compose config, and pack validation passed. For draft PR
+[#1](https://github.com/MrGr33n98/watch-ai/pull/1), Backend CI and Security
+Scans passed on commit `2038fd7`; Wear CI failed at the dependency metadata
+check because API 37 was required. The local API 37 configuration contract is
+green, and a GitHub run after that fix is pending. No APK or screenshots were
+produced by the failed CI run. The draft remains a review handoff, not release
+readiness. T041 remains partial; device-loss revocation, PostgreSQL integration,
+and live-provider checks also remain pending regardless of PR status. No merge
+or deployment was performed.

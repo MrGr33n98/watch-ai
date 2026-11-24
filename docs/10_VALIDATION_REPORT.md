@@ -6,7 +6,8 @@ O branch `feat/001-watch-ai-mvp` contém a implementação local do backend Fast
 o código-fonte Wear OS Compose, contratos OpenAPI, migrations, testes, workflows
 e documentação. O relatório técnico com evidências por slice está em
 [`docs/reports/watch-ai-validation-20261123.md`](reports/watch-ai-validation-20261123.md).
-O branch ainda não foi publicado e nenhum PR foi criado neste registro.
+O branch foi publicado e o draft PR [#1](https://github.com/MrGr33n98/watch-ai/pull/1)
+está aberto; nenhuma integração ou implantação foi executada.
 
 ## Implementado no código-fonte
 
@@ -48,7 +49,7 @@ PostgreSQL não foi configurado, portanto os 16 testes que requerem
 | P1 | WAHA e OpenRouter reais não validados. | T033/T034 dependem de sessão WAHA DEV isolada, credenciais e orçamento explicitamente aprovados. |
 | P1 | Deploy público não fornecido pelo repositório. | Compose é loopback-only e não configura TLS ingress, secret manager, backups off-host nem scheduler. |
 | P2 | Limite de gasto não reserva custo para chamadas concorrentes. | `MONTHLY_MODEL_BUDGET_USD` tem preflight/persistência, mas chamadas já em voo podem ultrapassar o limite. |
-| P1 | CI Wear ainda não passou. | Backend CI, pip-audit e Gitleaks passaram. API 36 setup passou; Gradle encontrou incompatibilidade entre AGP 9 e o plugin Kotlin Android legado. Migração para Kotlin integrado foi feita e aguarda novo run. |
+| P1 | CI Wear ainda não passou. | No commit `2038fd7`, Backend CI e Security Scans passaram. Gradle falhou em `checkDebugAarMetadata`: Wear Compose 1.7.2 exige `compileSdk 37`; a configuração 36 foi ajustada para 37 e o workflow agora instala API 37/build tools pelo canal canary. Nova execução ainda pendente. |
 
 ## Itens da missão ainda pendentes
 
@@ -58,9 +59,10 @@ PostgreSQL não foi configurado, portanto os 16 testes que requerem
   validar acessibilidade visual e produzir APK/screenshot com hashes.
 - T033–T034: integrações reais de WAHA e OpenRouter autorizadas.
 - T036, T038 e T039 continuam parciais conforme `specs/001-watch-ai-mvp/tasks.md`.
-- T041: revisão final completa e PR draft aberto em
-  [#1](https://github.com/MrGr33n98/watch-ai/pull/1). Nenhum APK ou screenshot
-  foi gerado. Não houve merge ou deploy.
+- T041: revisão final parcial e PR draft aberto em
+  [#1](https://github.com/MrGr33n98/watch-ai/pull/1). O CI Wear mais recente
+  falhou antes de gerar APK; screenshots, validação em hardware e demais gates
+  continuam pendentes. Não houve merge ou deploy.
 
 O relatório anterior de 2026-11-23 descrevia somente o pacote documental antes
 da implementação; as evidências atuais e o histórico dos slices constam no
