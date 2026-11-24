@@ -25,3 +25,14 @@ class WatchDevice:
     device_id: UUID
     user_id: UUID
     scope: str
+
+
+@dataclass(frozen=True, slots=True)
+class WatchDeviceSummary:
+    device_id: UUID
+    user_id: UUID
+    device_name: str
+    scope: str
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None

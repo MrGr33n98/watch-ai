@@ -80,6 +80,46 @@ class SymbolicVerifier:
             raise UnsupportedMathInput("Definite integral is unsupported by the symbolic verifier")
         return self._result("definite_integral", source_expression, result)
 
+    def solve_equation(
+        self,
+        lhs_expression: str,
+        rhs_expression: str,
+        *,
+        variable: str,
+    ) -> SymbolicVerification:
+        lhs = self._parse(lhs_expression)
+        rhs = self._parse(rhs_expression)
+        symbol = self._symbol_for_variable(variable)
+        try:
+            difference = sp.simplify(self._to_sympy(lhs) - self._to_sympy(rhs))
+            if difference == 0 or not difference.has(symbol):
+                raise UnsupportedMathInput("Equation has no unique finite solution set")
+            solutions = sp.solve(difference, symbol)
+        except UnsupportedMathInput:
+            raise
+        except (ArithmeticError, TypeError, ValueError, RecursionError) as error:
+            raise UnsupportedMathInput("Equation could not be solved safely") from error
+        if not isinstance(solutions, list) or not (1 <= len(solutions) <= 4):
+            raise UnsupportedMathInput("Equation did not yield a bounded solution list")
+
+        verified_roots: list[sp.Expr] = []
+        for root in solutions:
+            if not isinstance(root, sp.Expr) or root.free_symbols or root.has(sp.I):
+                raise UnsupportedMathInput("Equation solution is non-real or symbolic")
+            simplified_root = sp.simplify(root)
+            if sp.simplify(difference.subs(symbol, simplified_root)) != 0:
+                raise UnsupportedMathInput("Equation root failed substitution check")
+            verified_roots.append(simplified_root)
+
+        ordered = sorted(verified_roots, key=lambda item: float(sp.N(item)))
+        formatted = ", ".join(f"{symbol.name} = {sp.sstr(root)}" for root in ordered)
+        return SymbolicVerification(
+            operation="solve_equation",
+            source_expression=f"{lhs_expression} = {rhs_expression}",
+            result=formatted,
+            verified=True,
+        )
+
     def _parse(self, source_expression: str) -> ExpressionNode:
         try:
             return self._parser.parse(source_expression)

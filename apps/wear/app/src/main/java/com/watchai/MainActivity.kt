@@ -16,6 +16,16 @@ class MainActivity : ComponentActivity() {
         controller.start()
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (::controller.isInitialized) controller.setForegroundActive(true)
+    }
+
+    override fun onStop() {
+        if (::controller.isInitialized) controller.setForegroundActive(false)
+        super.onStop()
+    }
+
     override fun onDestroy() {
         if (::controller.isInitialized && isFinishing) controller.close()
         super.onDestroy()

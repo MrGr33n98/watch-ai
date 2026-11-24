@@ -23,8 +23,8 @@ WORKDIR /app
 
 RUN groupadd --system watchai \
     && useradd --system --gid watchai --home-dir /app watchai \
-    && mkdir -p /app/private-media \
-    && chown watchai:watchai /app/private-media
+    && mkdir -p /app/private-media /app/private-renders \
+    && chown watchai:watchai /app/private-media /app/private-renders
 
 COPY --from=builder --chown=watchai:watchai /app/.venv /app/.venv
 COPY --chown=watchai:watchai app ./app

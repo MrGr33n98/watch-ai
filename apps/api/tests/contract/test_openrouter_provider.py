@@ -134,3 +134,26 @@ def test_openrouter_timeout_retries_are_bounded() -> None:
     provider.close()
     assert calls == 3
     assert sleeps == [0.1, 0.2]
+
+
+def test_openrouter_parses_structured_math_extraction_payload() -> None:
+    output = {
+        "statement": "Parede: k=1,2 W/(m K), A=10 m^2, deltaT=40 K, L=0,20 m.",
+        "problem_type": "Fourier law",
+        "confidence": "high",
+        "needs_review": False,
+        "operation": "fourier",
+        "parameters": {
+            "k": {"value": "1,2", "unit": "W/(m K)"},
+            "A": {"value": "10", "unit": "m^2"},
+            "deltaT": {"value": "40", "unit": "K"},
+            "L": {"value": "0,20", "unit": "m"},
+        },
+    }
+    provider = provider_for(lambda _: make_response(json.dumps(output)))
+    result = provider.interpret(make_message(), image_bytes=b"private-jpeg")
+    provider.close()
+
+    assert result.operation == "fourier"
+    assert result.parameters["k"].value == "1,2"
+    assert result.parameters["k"].unit == "W/(m K)"

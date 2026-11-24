@@ -14,6 +14,8 @@ class ExerciseOperation(StrEnum):
     DERIVATIVE = "derivative"
     DEFINITE_INTEGRAL = "definite_integral"
     UNIT_CONVERSION = "unit_conversion"
+    SIMPLIFY = "simplify"
+    SOLVE_EQUATION = "solve_equation"
     UNSUPPORTED = "unsupported"
 
 
@@ -44,6 +46,7 @@ class SolutionProblem:
     variable: str | None = None
     lower: str | None = None
     upper: str | None = None
+    rhs: str | None = None
     parameters: Mapping[str, PhysicalQuantity] = field(default_factory=dict)
     target_unit: str | None = None
 
@@ -66,6 +69,7 @@ class SolutionStep:
     verified: bool
     latex: str | None = None
     alt_text: str | None = None
+    render_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

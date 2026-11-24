@@ -23,10 +23,14 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in infra/.env}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
       MONTHLY_MODEL_BUDGET_USD: ${MONTHLY_MODEL_BUDGET_USD:-}
+      VISION_PROVIDER: ${VISION_PROVIDER:-auto}
+      ENABLE_EMBEDDED_WORKER: ${ENABLE_EMBEDDED_WORKER:-false}
       ENABLE_WAHA_INGEST: ${ENABLE_WAHA_INGEST:-false}
+      WAHA_SEND_REPLIES: ${WAHA_SEND_REPLIES:-false}
       WAHA_BASE_URL: ${WAHA_BASE_URL:-}
       WAHA_API_KEY: ${WAHA_API_KEY:-}
       WAHA_WEBHOOK_HMAC_SECRET: ${WAHA_WEBHOOK_HMAC_SECRET:-}
@@ -37,10 +41,12 @@ services:
       WAHA_DEFAULT_QUESTION_COUNT: ${WAHA_DEFAULT_QUESTION_COUNT:-4}
       WAHA_BATCH_EXPIRY_SECONDS: ${WAHA_BATCH_EXPIRY_SECONDS:-3600}
       WATCH_AI_MEDIA_DIR: /app/private-media
+      WATCH_AI_RENDER_DIR: /app/private-renders
       MEDIA_RETENTION_HOURS: ${MEDIA_RETENTION_HOURS:-24}
       SESSION_RETENTION_DAYS: ${SESSION_RETENTION_DAYS:-30}
     volumes:
       - watch_ai_private_media:/app/private-media
+      - watch_ai_private_renders:/app/private-renders
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +68,53 @@ services:
       - ALL
     restart: unless-stopped
 
+  worker:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.worker"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in infra/.env}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      MONTHLY_MODEL_BUDGET_USD: ${MONTHLY_MODEL_BUDGET_USD:-}
+      VISION_PROVIDER: ${VISION_PROVIDER:-auto}
+      OUTBOX_POLL_INTERVAL_SECONDS: ${OUTBOX_POLL_INTERVAL_SECONDS:-1.0}
+      WATCH_AI_MEDIA_DIR: /app/private-media
+      WATCH_AI_RENDER_DIR: /app/private-renders
+    volumes:
+      - watch_ai_private_media:/app/private-media
+      - watch_ai_private_renders:/app/private-renders
+    depends_on:
+      db:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8-alpine
+    profiles: ["tls"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      WATCH_AI_DOMAIN: ${WATCH_AI_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   watch_ai_private_media:
+  watch_ai_private_renders:
+  caddy_data:
+  caddy_config:

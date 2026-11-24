@@ -6,7 +6,7 @@ from types import TracebackType
 from typing import Protocol, Self
 from uuid import UUID
 
-from app.domain.delivery.models import WatchDevice
+from app.domain.delivery.models import WatchDevice, WatchDeviceSummary
 from app.domain.ingestion.images import AdmittedJpeg
 from app.domain.ingestion.models import InboundMessage, OutboxEvent
 from app.domain.interpretation.models import InterpretedExercise
@@ -85,5 +85,9 @@ class DeliveryRepository(Protocol):
     ) -> UUID | None: ...
 
     def find_active_device(self, token_hash: str, now: datetime) -> WatchDevice | None: ...
+
+    def list_devices(self, user_id: UUID) -> Sequence[WatchDeviceSummary]: ...
+
+    def user_exists(self, user_id: UUID) -> bool: ...
 
     def revoke_device(self, device_id: UUID, user_id: UUID, now: datetime) -> bool: ...

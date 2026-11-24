@@ -66,7 +66,13 @@ fun QuestionStepsScreen(
             WearTextItem("Problema", transformationSpec, this, style = MaterialTheme.typography.titleSmall)
         }
         item(key = "statement", contentType = "statement") {
-            WearTextItem(detail.statement, transformationSpec, this, style = MaterialTheme.typography.bodyLarge)
+            WearTextItem(
+                detail.statement,
+                transformationSpec,
+                this,
+                style = MaterialTheme.typography.bodyLarge,
+                accessibilityText = "Enunciado do problema: ${detail.statement}",
+            )
         }
 
         if (currentStep != null) {

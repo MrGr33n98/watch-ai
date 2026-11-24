@@ -31,7 +31,8 @@ The real variable names are declared in `infra/docker-compose.yml` and
 | `WAHA_ALLOWED_SESSIONS`, `WAHA_ALLOWED_SENDERS`, `WAHA_SENDER_USER_IDS` | Explicit allowlists. Map every sender to an existing owner UUID (`sender=UUID`). Keep WAHA disabled until the isolated session, allowlists, and webhook authentication have passed QA. |
 | `WATCH_AI_MEDIA_DIR` | Private app volume only; do not serve this directory from the web server. |
 | `MEDIA_RETENTION_HOURS`, `SESSION_RETENTION_DAYS` | Set only to the approved privacy policy. Current defaults are 24 hours and 30 days. |
-| Watch pairing token | Issued by the API and stored server-side as a hash. The current `DELETE /v1/devices/me` endpoint revokes only the calling watch. A lost watch cannot currently be revoked remotely; add an owner/admin revocation flow before production. There is no signing-key environment variable. |
+| `ADMIN_API_KEY` | Optional >= 32-byte server-side operator secret protecting `/v1/admin/*` and unlocking `/phone`. When unset, operator routes and `/phone` fail closed with `404`. |
+| Watch pairing token | Issued by the API and stored server-side as a hash. `DELETE /v1/devices/me` revokes the calling watch, and `DELETE /v1/admin/users/{user_id}/devices/{device_id}` (or `python -m app.maintenance.admin revoke-device`) revokes a lost watch remotely. |
 
 Keep `ENABLE_WAHA_INGEST=false` and provider credentials unset for mock-only
 testing. For an approved isolated WAHA environment, configure its webhook to
@@ -189,9 +190,10 @@ production data.
 ## Incident response and rollback
 
 - **Lost or exposed watch:** if the watch still has its credential, use its
-  `DELETE /v1/devices/me` action. Remote owner/admin revocation is not
-  implemented, so a lost watch is a production blocker until that workflow is
-  added. Do not improvise an unaudited SQL update. Review redacted request logs.
+  `DELETE /v1/devices/me` action. To revoke a lost watch remotely, use `/phone` or
+  `DELETE /v1/admin/users/{user_id}/devices/{device_id}` (or run
+  `python -m app.maintenance.admin revoke-device --user-id ... --device-id ...`).
+  Review redacted request logs.
 - **Leaked API/WAHA secret:** disable the corresponding integration, rotate the
   secret in its source and API environment, redeploy, and verify the old value
   is rejected. Never place the replacement in an APK or commit.

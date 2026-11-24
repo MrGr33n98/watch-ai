@@ -1,12 +1,21 @@
 """Use cases for one-time watch pairing and scoped opaque credentials."""
 
 import secrets
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from uuid import UUID, uuid4
 
 from app.application.ports import DeliveryRepository
-from app.domain.delivery.models import WATCH_READ_SCOPE, PairingCodeRejected, WatchCredential
+from app.domain.delivery.models import (
+    WATCH_READ_SCOPE,
+    PairingCodeRejected,
+    WatchCredential,
+    WatchDeviceSummary,
+)
+
+_PAIRING_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+_PAIRING_LENGTH = 8
 
 
 class PairingService:
@@ -27,7 +36,7 @@ class PairingService:
         if expiration <= current_time:
             raise ValueError("Pairing code expiration must be in the future")
 
-        code = secrets.token_urlsafe(9)
+        code = "".join(secrets.choice(_PAIRING_ALPHABET) for _ in range(_PAIRING_LENGTH))
         self._repository.add_pairing_code(
             user_id,
             self._hash(code),
@@ -49,14 +58,15 @@ class PairingService:
         normalized_name = device_name.strip()
         if not normalized_name or len(normalized_name) > 120:
             raise ValueError("Device name must contain 1 to 120 characters")
-        if not pairing_code.strip():
+        normalized_code = _normalize_pairing_code(pairing_code)
+        if not normalized_code:
             raise PairingCodeRejected("Pairing code is invalid or expired")
 
         access_token = secrets.token_urlsafe(32)
         device_id = uuid4()
         expires_at = current_time + timedelta(days=30)
         user_id = self._repository.redeem_pairing_code(
-            self._hash(pairing_code),
+            self._hash(normalized_code),
             device_id,
             normalized_name,
             self._hash(access_token),
@@ -73,9 +83,16 @@ class PairingService:
             expires_at=expires_at,
         )
 
+    def list_devices(self, user_id: UUID) -> Sequence[WatchDeviceSummary]:
+        return self._repository.list_devices(user_id)
+
     def revoke_device(self, device_id: UUID, user_id: UUID, *, now: datetime | None = None) -> bool:
         return self._repository.revoke_device(device_id, user_id, now or datetime.now(UTC))
 
     @staticmethod
     def _hash(secret: str) -> str:
         return sha256(secret.encode("utf-8")).hexdigest()
+
+
+def _normalize_pairing_code(raw: str) -> str:
+    return raw.strip().upper().replace("-", "").replace(" ", "")

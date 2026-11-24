@@ -1074,3 +1074,30 @@ run is pending. No APK or screenshots were produced. The draft remains a review
 handoff, not release readiness. T041 remains partial; device-loss revocation,
 PostgreSQL integration, and live-provider checks also remain pending regardless
 of PR status. No merge or deployment was performed.
+
+## Continuation MVP Verification — 2026-11-24
+
+Implemented the remaining phone-and-watch MVP capabilities on `feat/001-watch-ai-mvp`:
+
+- **Wear CI & test alignment**: switched `.github/workflows/wear-ci.yml` emulator step to `api-level: 34` (`target: android-wear`, `arch: x86_64`, `profile: wearos_small_round` on `channel-0`); disambiguated `QuestionStepsScreen.kt` statement accessibility description from step 1; fixed non-UUID cache-miss test input in `OfflineSessionCacheTest.kt`; added `.performScrollTo()` for small round viewport tests in `SessionListScreenTest.kt`; preserved existing loggers in `apps/api/alembic/env.py` (`disable_existing_loggers=False`).
+- **Worker, structured AI extraction, expanded math verification & formula SVG endpoint**: added `app.worker` (`python -m app.worker`) plus optional `ENABLE_EMBEDDED_WORKER`, `StructuredProblemMapper` bridging OpenRouter structured fields (`operation`, `expression`, `variable`, `lower`, `upper`, `rhs`, `target_unit`, `parameters`) to SymPy/Pint (`simplify`, `solve_equation`, derivative, integral, dimensional analysis), expanded closed Pint alias allowlist, persisted `render_url`, and added owner-scoped `GET /v1/sessions/{session_id}/questions/{ordinal}/steps/{step_ordinal}/render` returning sandboxed `image/svg+xml`.
+- **Provisioning, remote lost-watch revocation, WAHA status replies & `/phone` console**: added `ADMIN_API_KEY`-protected `/v1/admin/*` routes (`POST /v1/admin/users`, `POST /v1/admin/pairings`, `GET /v1/admin/users/{user_id}/devices`, `DELETE /v1/admin/users/{user_id}/devices/{device_id}` P0 remote watch revocation, `POST /v1/admin/users/{user_id}/batches/upload`, `GET /v1/admin/budget`), CLI `python -m app.maintenance.admin`, fail-closed mobile web console `GET /phone`, optional best-effort `WahaReplyClient`, unambiguous 8-character pairing codes with normalized entry, and PostgreSQL parent-flush before `InboundMessageRecord` inserts during batch upload.
+- **Wear OS UX**: added lifecycle-aware active session/question polling with `15s -> 30s -> 60s` backoff (`WatchController`), last session/question/step restore across restarts (`WatchPreferencesStore`), manual `"Atualizar"` triggers, pairing/URL placeholders, question `resultPreview` subtitle, optional `BuildConfig.DEFAULT_API_BASE_URL`, and `WatchControllerTest` JVM coroutine tests.
+- **Compose & runbooks**: added `worker` service and `watch_ai_private_renders` volume (plus optional `tls` `caddy` profile) in `infra/docker-compose.yml`, ensured `/app/private-renders` ownership in `apps/api/Dockerfile`, and updated `docs/09_ENV_RUNBOOK.md` and `infra/README.md`.
+
+### Observed checks after final code edits
+
+- **Backend full suite against PostgreSQL (`infra-db-1`, `127.0.0.1:15432`)**:
+  - `cd apps/api && TEST_DATABASE_URL='postgresql+psycopg://watch_ai:replace-with-a-random-local-password@127.0.0.1:15432/watch_ai' uv run pytest -q` → `157 passed, 1 warning in 52.45s` (`0 skipped`).
+  - `uv run ruff check .` → `All checks passed!`
+  - `uv run mypy app` → `Success: no issues found in 77 source files`
+  - `uv run bandit -r app -q` → 1 pre-existing Low finding (`B406` on `xml.sax.saxutils.escape` in `app/adapters/renderer/formulas.py:11`), 0 Medium/High findings (`BANDIT_EXIT=1`).
+  - Alembic verification against PostgreSQL → `upgrade head`, `check` (`No new upgrade operations detected.`), and `downgrade base` succeeded (`ALEMBIC_OK`).
+- **Repository & config validators**:
+  - `python3 tools/validate_pack.py` → `PASS` (`T001..T041`).
+  - `apps/api/.venv/bin/python tools/validate_goldens.py` → `PASS`.
+  - `docker compose --env-file infra/.env.example -f infra/docker-compose.yml config --quiet` → exit `0`.
+- **Docker Compose build & live E2E smoke (`watch-ai-smoke`, `APP_ENV=development`, `VISION_PROVIDER=fake`)**:
+  - Built `api` and `worker` images cleanly, verified `alembic --version` (`alembic 1.20.1`) and `alembic upgrade head`, started `db`, `api`, `worker` (`Healthy`).
+  - Exercised `GET /health` (`200`), `GET /phone` (`200`, no admin key leaked), `POST /v1/admin/users` (`201`), `POST /v1/admin/pairings` (`201`, 8-char code), `POST /v1/device-pairings` (`201`, lowercase hyphenated code accepted), `POST /v1/admin/users/{user_id}/batches/upload` with `Q1_synthetic.jpg` and `Q2_synthetic.jpg` (`202`), polled `GET /v1/sessions/{session_id}` until `worker` transitioned session to `needs_review` with 2 steps on Q1 (`Q1_DETAIL_STATUS: needs_review STEPS: 2`), revoked watch via `DELETE /v1/admin/users/{user_id}/devices/{device_id}` (`204`), and verified subsequent `GET /v1/sessions` with the revoked token returned `401` (`COMPOSE_SMOKE_OK`), then ran `docker compose down -v`.
+- **Pending / externally gated**: GitHub Actions execution for the updated `Wear OS CI` / `Backend CI` / `Security Scans` runs on this push, plus physical hardware (`T003`–`T004`) and live external WAHA DEV / OpenRouter credentials (`T005`, `T033`, `T034`).

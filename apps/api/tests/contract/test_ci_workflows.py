@@ -68,6 +68,19 @@ def test_wear_ci_uses_latest_stable_material3_and_preview_sdk_cli() -> None:
     assert "sdkmanager --channel" not in wear_workflow
 
 
+def test_wear_ci_runs_instrumented_tests_on_a_supported_round_wear_image() -> None:
+    wear_workflow = _read_workflow("wear-ci.yml")
+    steps = wear_workflow["jobs"]["wear"]["steps"]
+    emulator = next(
+        step for step in steps if step.get("name") == "Run Wear UI tests on a round emulator"
+    )
+
+    assert emulator["with"]["api-level"] == 34
+    assert emulator["with"]["target"] == "android-wear"
+    assert emulator["with"]["profile"] == "wearos_small_round"
+    assert ":app:connectedDebugAndroidTest" in emulator["with"]["script"]
+
+
 def test_agp_9_uses_builtin_kotlin_and_the_compose_compiler_plugin() -> None:
     root_gradle = (REPOSITORY_ROOT / "apps" / "wear" / "build.gradle.kts").read_text(
         encoding="utf-8"

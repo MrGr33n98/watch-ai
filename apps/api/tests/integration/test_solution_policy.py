@@ -122,6 +122,34 @@ def test_unsupported_or_hostile_math_requires_review() -> None:
             "1.5",
             "kW",
         ),
+        (
+            SolutionProblem(
+                ordinal=1,
+                statement="Simplifique (x^2 - x*x + 4).",
+                problem_type="simplify",
+                confidence=InterpretationConfidence.HIGH,
+                needs_review=False,
+                operation=ExerciseOperation.SIMPLIFY,
+                expression="x**2 - x*x + 4",
+            ),
+            "4",
+            None,
+        ),
+        (
+            SolutionProblem(
+                ordinal=2,
+                statement="Resolva 2x + 4 = 10.",
+                problem_type="equation",
+                confidence=InterpretationConfidence.HIGH,
+                needs_review=False,
+                operation=ExerciseOperation.SOLVE_EQUATION,
+                expression="2*x + 4",
+                rhs="10",
+                variable="x",
+            ),
+            "x = 3",
+            None,
+        ),
     ],
 )
 def test_supported_goldens_produce_verified_ordered_steps(

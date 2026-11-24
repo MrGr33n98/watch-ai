@@ -121,6 +121,11 @@ fun SessionListScreen(
                 }
             }
         }
+        if (!loading && errorMessage == null && sessions.isNotEmpty()) {
+            item(key = "refresh", contentType = "action") {
+                WearActionButton("Atualizar", "Atualizar sessões", transformationSpec, this, onRetry)
+            }
+        }
         if (sessions.isNotEmpty()) {
             item(key = "revoke", contentType = "action") {
                 WearActionButton("Revogar dispositivo", "Revogar dispositivo", transformationSpec, this, onRevokeDevice)

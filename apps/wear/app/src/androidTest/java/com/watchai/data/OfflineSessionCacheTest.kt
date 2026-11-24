@@ -41,7 +41,7 @@ class OfflineSessionCacheTest {
                 ),
             ),
         )
-        assertNull(cache.readSession("missing"))
+        assertNull(cache.readSession(UUID.randomUUID().toString()))
         cache.writeSession(sessionId, "{}")
         cache.writeQuestion(sessionId, 4, "{}")
 

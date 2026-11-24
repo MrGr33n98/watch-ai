@@ -12,3 +12,5 @@ def test_runtime_image_contains_alembic_migration_assets() -> None:
     assert "COPY --chown=watchai:watchai alembic ./alembic" in dockerfile
     assert "COPY --chown=watchai:watchai alembic.ini ./alembic.ini" in dockerfile
     assert "MONTHLY_MODEL_BUDGET_USD:" in compose_file
+    assert "worker:" in compose_file
+    assert "ADMIN_API_KEY:" in compose_file

@@ -70,6 +70,10 @@ class WahaBatchCoordinator(Protocol):
     def finish(self, sender_hmac: str, *, now: datetime | None = None) -> BatchResult: ...
 
 
+class WahaTextReplier(Protocol):
+    async def send_text(self, *, session: str, chat_id: str, text: str) -> bool: ...
+
+
 @dataclass(frozen=True, slots=True)
 class WahaWebhookSettings:
     enabled: bool = False
@@ -84,6 +88,7 @@ class WahaWebhookSettings:
     default_expected_count: int = 4
     batch_expiry_seconds: int = 3600
     max_body_bytes: int = MAX_WEBHOOK_BODY_BYTES
+    send_replies: bool = False
 
     def __post_init__(self) -> None:
         if isinstance(self.max_body_bytes, bool) or not (
@@ -124,6 +129,8 @@ class WahaWebhookSettings:
             sender_owner_ids=_parse_sender_owners(os.getenv("WAHA_SENDER_USER_IDS", "")),
             default_expected_count=int(os.getenv("WAHA_DEFAULT_QUESTION_COUNT", "4")),
             batch_expiry_seconds=int(os.getenv("WAHA_BATCH_EXPIRY_SECONDS", "3600")),
+            send_replies=os.getenv("WAHA_SEND_REPLIES", "false").strip().lower()
+            in {"true", "1", "yes"},
         )
 
     def owner_id_for_sender(self, sender: str) -> UUID | None:
@@ -223,9 +230,31 @@ async def receive_waha_webhook(request: Request) -> dict[str, object] | JSONResp
                 else batch_service.finish(sender_hmac, now=timestamp)
             )
         except NoActiveBatch as error:
+            await _maybe_reply(
+                request,
+                session=session_name,
+                sender=sender,
+                text="Nenhum lote ativo com fotos. Envie INICIAR antes das imagens.",
+            )
             raise HTTPException(status_code=409, detail=str(error)) from error
         except SenderOwnerMismatch as error:
             raise HTTPException(status_code=403, detail="WAHA sender owner mismatch") from error
+        if command_result.status.value == "started":
+            reply_text = (
+                f"Sessão iniciada (até {command_result.expected_count} fotos JPG). "
+                "Envie as imagens ou FINALIZAR."
+            )
+        elif command_result.status.value == "already_active":
+            reply_text = (
+                f"Sessão já ativa ({command_result.received_count}/"
+                f"{command_result.expected_count}). Envie mais fotos ou FINALIZAR."
+            )
+        else:
+            reply_text = (
+                f"Lote fechado ({command_result.received_count} questões). "
+                "Processando soluções — abra o Watch AI no relógio."
+            )
+        await _maybe_reply(request, session=session_name, sender=sender, text=reply_text)
         return {
             "status": command_result.status.value,
             "session_id": str(command_result.session_id),
@@ -239,6 +268,12 @@ async def receive_waha_webhook(request: Request) -> dict[str, object] | JSONResp
     if not isinstance(media, Mapping):
         raise HTTPException(status_code=422, detail="Invalid WAHA media metadata")
     if media.get("mimetype") != "image/jpeg":
+        await _maybe_reply(
+            request,
+            session=session_name,
+            sender=sender,
+            text="Formato não suportado. Envie cada exercício como imagem ou documento JPG.",
+        )
         raise HTTPException(status_code=415, detail="Only JPEG images are accepted")
     media_url = media.get("url")
     if not isinstance(media_url, str) or not media_url.strip() or media.get("error"):
@@ -264,6 +299,12 @@ async def receive_waha_webhook(request: Request) -> dict[str, object] | JSONResp
     try:
         batch_service.require_active(sender_hmac, owner_id, now=timestamp)
     except NoActiveBatch as error:
+        await _maybe_reply(
+            request,
+            session=session_name,
+            sender=sender,
+            text="Nenhuma sessão aberta. Envie INICIAR antes das fotos.",
+        )
         raise HTTPException(status_code=409, detail=str(error)) from error
     except SenderOwnerMismatch as error:
         raise HTTPException(status_code=403, detail="WAHA sender owner mismatch") from error
@@ -286,8 +327,20 @@ async def receive_waha_webhook(request: Request) -> dict[str, object] | JSONResp
             provider_timestamp=timestamp,
         )
     except NoActiveBatch as error:
+        await _maybe_reply(
+            request,
+            session=session_name,
+            sender=sender,
+            text="Lote já concluído. Envie INICIAR para abrir uma nova sessão.",
+        )
         raise HTTPException(status_code=409, detail=str(error)) from error
     if batch_result.status.value == "expired":
+        await _maybe_reply(
+            request,
+            session=session_name,
+            sender=sender,
+            text="Sessão expirada. Envie INICIAR para começar outra.",
+        )
         raise HTTPException(status_code=410, detail="WAHA batch expired")
     if batch_result.status.value == "duplicate":
         return JSONResponse(
@@ -319,12 +372,41 @@ async def receive_waha_webhook(request: Request) -> dict[str, object] | JSONResp
             status_code=200,
             content={"status": "duplicate", "message_id": result.message_id},
         )
+    embedded_worker = getattr(request.app.state, "embedded_worker", None)
+    if embedded_worker is not None:
+        embedded_worker.wake()
+    if batch_result.status.value == "finalized":
+        reply_text = (
+            f"Lote fechado ({batch_result.received_count}/{batch_result.expected_count}). "
+            "Processando soluções — abra o Watch AI no relógio."
+        )
+    else:
+        reply_text = (
+            f"Questão {batch_result.received_count}/{batch_result.expected_count} recebida."
+        )
+    await _maybe_reply(request, session=session_name, sender=sender, text=reply_text)
     return {
         "status": "accepted",
         "message_id": result.message_id,
         "session_id": str(batch_result.session_id),
         "ordinal": batch_result.ordinal or 0,
     }
+
+
+async def _maybe_reply(
+    request: Request,
+    *,
+    session: str,
+    sender: str,
+    text: str,
+) -> None:
+    settings: WahaWebhookSettings = request.app.state.waha_settings
+    if not settings.send_replies:
+        return
+    reply_client: WahaTextReplier | None = getattr(request.app.state, "waha_reply_client", None)
+    if reply_client is None:
+        return
+    await reply_client.send_text(session=session, chat_id=sender, text=text)
 
 
 async def _read_bounded_body(request: Request, maximum_bytes: int) -> bytes:

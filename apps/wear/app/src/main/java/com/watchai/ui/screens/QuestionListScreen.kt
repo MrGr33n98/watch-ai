@@ -63,6 +63,11 @@ fun QuestionListScreen(
                 QuestionButton(question, transformationSpec, this) { onOpenQuestion(question.ordinal) }
             }
         }
+        if (!loading && errorMessage == null) {
+            item(key = "refresh", contentType = "action") {
+                WearActionButton("Atualizar", "Atualizar questões", transformationSpec, this, onRetry)
+            }
+        }
         item(key = "back", contentType = "action") {
             WearActionButton("Voltar", "Voltar para sessões", transformationSpec, this, onBack)
         }
@@ -85,6 +90,8 @@ private fun QuestionButton(
         },
         transformation = itemScope.SurfaceTransformation(transformationSpec),
         label = { Text(question.label) },
-        secondaryLabel = { Text(question.title ?: status) },
+        secondaryLabel = {
+            Text(listOfNotNull(question.title ?: status, question.resultPreview).joinToString(" · "))
+        },
     )
 }

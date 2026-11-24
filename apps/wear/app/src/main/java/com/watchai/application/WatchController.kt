@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.watchai.BuildConfig
 import com.watchai.data.AtomicSessionFileCache
 import com.watchai.data.OfflineSessionCache
 import com.watchai.data.StudyJsonCodec
@@ -12,6 +13,8 @@ import com.watchai.data.WatchApi
 import com.watchai.data.WatchApiClient
 import com.watchai.data.WatchApiFailure
 import com.watchai.domain.QuestionDetail
+import com.watchai.domain.QuestionStatus
+import com.watchai.domain.SessionStatus
 import com.watchai.domain.SessionSummary
 import com.watchai.domain.StudySession
 import com.watchai.security.AndroidKeystoreCredentialStore
@@ -22,10 +25,13 @@ import com.watchai.ui.screens.QuestionListScreen
 import com.watchai.ui.screens.QuestionStepsScreen
 import com.watchai.ui.screens.SessionListScreen
 import com.watchai.ui.screens.WatchAiWearRoot
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -44,47 +50,163 @@ data class WatchUiState(
     val errorMessage: String? = null,
 )
 
-class WatchController internal constructor(
-    context: Context,
-    private val credentialStore: CredentialStore = AndroidKeystoreCredentialStore(context),
-    private val cache: OfflineSessionCache = AtomicSessionFileCache(context),
-    private val apiFactory: (String) -> WatchApi = { endpoint -> WatchApiClient(endpoint) },
-) {
-    private val preferences = context.applicationContext.getSharedPreferences(ENDPOINT_PREFS, Context.MODE_PRIVATE)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+interface WatchPreferencesStore {
+    fun getEndpoint(): String
+    fun setEndpoint(value: String)
+    fun getLastSessionId(): String?
+    fun setLastSessionId(value: String?)
+    fun getLastQuestionOrdinal(): Int?
+    fun setLastQuestionOrdinal(value: Int?)
+    fun getLastStepIndex(): Int
+    fun setLastStepIndex(value: Int)
+    fun clearNavigation()
+}
 
-    var state by mutableStateOf(WatchUiState(endpoint = preferences.getString(KEY_ENDPOINT, "") ?: ""))
+internal class SharedPreferencesWatchStore(context: Context) : WatchPreferencesStore {
+    private val preferences =
+        context.applicationContext.getSharedPreferences(ENDPOINT_PREFS, Context.MODE_PRIVATE)
+
+    override fun getEndpoint(): String =
+        preferences.getString(KEY_ENDPOINT, BuildConfig.DEFAULT_API_BASE_URL) ?: ""
+
+    override fun setEndpoint(value: String) {
+        preferences.edit().putString(KEY_ENDPOINT, value.trim()).apply()
+    }
+
+    override fun getLastSessionId(): String? = preferences.getString(KEY_LAST_SESSION_ID, null)
+
+    override fun setLastSessionId(value: String?) {
+        preferences.edit().putString(KEY_LAST_SESSION_ID, value).apply()
+    }
+
+    override fun getLastQuestionOrdinal(): Int? {
+        val stored = preferences.getInt(KEY_LAST_QUESTION_ORDINAL, 0)
+        return stored.takeIf { it in 1..4 }
+    }
+
+    override fun setLastQuestionOrdinal(value: Int?) {
+        val editor = preferences.edit()
+        if (value == null) editor.remove(KEY_LAST_QUESTION_ORDINAL) else editor.putInt(KEY_LAST_QUESTION_ORDINAL, value)
+        editor.apply()
+    }
+
+    override fun getLastStepIndex(): Int = preferences.getInt(KEY_LAST_STEP_INDEX, 0).coerceAtLeast(0)
+
+    override fun setLastStepIndex(value: Int) {
+        preferences.edit().putInt(KEY_LAST_STEP_INDEX, value.coerceAtLeast(0)).apply()
+    }
+
+    override fun clearNavigation() {
+        preferences.edit()
+            .remove(KEY_LAST_SESSION_ID)
+            .remove(KEY_LAST_QUESTION_ORDINAL)
+            .remove(KEY_LAST_STEP_INDEX)
+            .apply()
+    }
+
+    private companion object {
+        const val ENDPOINT_PREFS = "watch_ai_endpoint"
+        const val KEY_ENDPOINT = "base_url"
+        const val KEY_LAST_SESSION_ID = "last_session_id"
+        const val KEY_LAST_QUESTION_ORDINAL = "last_question_ordinal"
+        const val KEY_LAST_STEP_INDEX = "last_step_index"
+    }
+}
+
+    constructor(context: Context) : this(
+        preferences = SharedPreferencesWatchStore(context),
+        credentialStore = AndroidKeystoreCredentialStore(context),
+        cache = AtomicSessionFileCache(context),
+    )
+
+    internal constructor(
+        preferences: WatchPreferencesStore,
+        credentialStore: CredentialStore,
+        cache: OfflineSessionCache,
+        apiFactory: (String) -> WatchApi = { endpoint -> WatchApiClient(endpoint) },
+        mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        pollIntervalsMillis: List<Long> = listOf(15_000L, 30_000L, 60_000L),
+        deviceNameProvider: () -> String = {
+            val manufacturer = Build.MANUFACTURER ?: "Wear"
+            val model = Build.MODEL ?: "Watch"
+            "$manufacturer $model".trim()
+        },
+    ) {
+        this.preferences = preferences
+        this.credentialStore = credentialStore
+        this.cache = cache
+        this.apiFactory = apiFactory
+        this.ioDispatcher = ioDispatcher
+        this.pollIntervalsMillis = pollIntervalsMillis
+        this.deviceNameProvider = deviceNameProvider
+        this.scope = CoroutineScope(SupervisorJob() + mainDispatcher)
+        this.state = WatchUiState(endpoint = preferences.getEndpoint())
+    }
+
+    private val preferences: WatchPreferencesStore
+    private val credentialStore: CredentialStore
+    private val cache: OfflineSessionCache
+    private val apiFactory: (String) -> WatchApi
+    private val ioDispatcher: CoroutineDispatcher
+    private val pollIntervalsMillis: List<Long>
+    private val deviceNameProvider: () -> String
+    private val scope: CoroutineScope
+    private var pollingJob: Job? = null
+    private var foregroundActive: Boolean = true
+
+    var state by mutableStateOf(WatchUiState())
         private set
 
     fun start() {
         if (credentialStore.read() == null) {
             state = state.copy(destination = WatchDestination.PAIRING)
+            return
+        }
+        val restoredSessionId = preferences.getLastSessionId()
+        val restoredOrdinal = preferences.getLastQuestionOrdinal()
+        val restoredStep = preferences.getLastStepIndex()
+        if (restoredSessionId != null && restoredOrdinal != null) {
+            openQuestion(restoredSessionId, restoredOrdinal, initialStepIndex = restoredStep)
+        } else if (restoredSessionId != null) {
+            openSession(restoredSessionId)
         } else {
             state = state.copy(destination = WatchDestination.SESSIONS)
             loadSessions()
         }
     }
 
+    fun setForegroundActive(active: Boolean) {
+        foregroundActive = active
+        if (!active) {
+            cancelPolling()
+        } else {
+            schedulePollingIfNeeded()
+        }
+    }
+
     fun setEndpoint(value: String) {
         state = state.copy(endpoint = value, errorMessage = null)
-        preferences.edit().putString(KEY_ENDPOINT, value.trim()).apply()
+        preferences.setEndpoint(value)
     }
 
     fun setPairingCode(value: String) {
         state = state.copy(
-            pairingCode = value.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.take(12),
+            pairingCode = normalizeCodeInput(value),
             errorMessage = null,
         )
     }
 
     fun showPairing() {
+        cancelPolling()
         state = state.copy(destination = WatchDestination.PAIRING, errorMessage = null)
     }
 
     fun pair() {
         val endpoint = state.endpoint.trim()
-        val code = state.pairingCode.trim()
-        if (!endpoint.startsWith("https://", ignoreCase = true) || code.length !in 6..12) {
+        val code = normalizeCodeInput(state.pairingCode)
+        val compactCode = code.replace("-", "")
+        if (!endpoint.startsWith("https://", ignoreCase = true) || compactCode.length !in 6..12) {
             state = state.copy(errorMessage = "Informe um endereço HTTPS e um código válido.")
             return
         }
@@ -93,12 +215,13 @@ class WatchController internal constructor(
             try {
                 val oldCredential = credentialStore.read()
                 val api = apiFactory(endpoint)
-                val paired = api.pair(code, "${Build.MANUFACTURER} ${Build.MODEL}".take(120))
+                val paired = api.pair(compactCode, deviceNameProvider().take(120))
                 require(paired.scope == READ_SCOPE && paired.accessToken.length >= MIN_TOKEN_LENGTH) {
                     "Resposta de pareamento inválida"
                 }
                 if (oldCredential != null && oldCredential.deviceId != paired.deviceId) {
-                    withContext(Dispatchers.IO) { cache.clear() }
+                    withContext(ioDispatcher) { cache.clear() }
+                    preferences.clearNavigation()
                 }
                 credentialStore.save(
                     DeviceCredential(
@@ -115,17 +238,20 @@ class WatchController internal constructor(
         }
     }
 
-    fun loadSessions() {
+    fun loadSessions(silent: Boolean = false) {
         val credential = credentialStore.read()
         if (credential == null) {
+            cancelPolling()
             state = state.copy(destination = WatchDestination.PAIRING, loading = false)
             return
         }
-        state = state.copy(loading = true, offline = false, errorMessage = null)
+        if (!silent) {
+            state = state.copy(loading = true, offline = false, errorMessage = null)
+        }
         scope.launch {
             try {
                 val result = apiFactory(state.endpoint.trim()).listSessions(credential.accessToken)
-                withContext(Dispatchers.IO) { runCatching { cache.writeSessionList(StudyJsonCodec.encodeSessionList(result)) } }
+                withContext(ioDispatcher) { runCatching { cache.writeSessionList(StudyJsonCodec.encodeSessionList(result)) } }
                 state = state.copy(
                     destination = WatchDestination.SESSIONS,
                     sessions = result,
@@ -133,21 +259,14 @@ class WatchController internal constructor(
                     offline = false,
                     errorMessage = null,
                 )
+                schedulePollingIfNeeded()
             } catch (failure: Exception) {
                 if (isAuthorizationFailure(failure)) {
-                    invalidateDevice()
-                    state = state.copy(
-                        destination = WatchDestination.PAIRING,
-                        sessions = emptyList(),
-                        activeSession = null,
-                        activeQuestion = null,
-                        loading = false,
-                        errorMessage = "Pareamento expirado. Vincule o relógio novamente.",
-                    )
+                    handleUnauthorized()
                     return@launch
                 }
                 val cached = if (failure.isConnectivityFailure()) {
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         runCatching { cache.readSessionList()?.let(StudyJsonCodec::decodeSessionList) }.getOrNull()
                     }
                 } else null
@@ -162,17 +281,23 @@ class WatchController internal constructor(
                 } else {
                     state.copy(loading = false, offline = false, errorMessage = safeMessage(failure))
                 }
+                cancelPolling()
             }
         }
     }
 
-    fun openSession(sessionId: String) {
+    fun openSession(sessionId: String, silent: Boolean = false) {
         val credential = credentialStore.read() ?: return requirePairing()
-        state = state.copy(loading = true, errorMessage = null)
+        preferences.setLastSessionId(sessionId)
+        preferences.setLastQuestionOrdinal(null)
+        preferences.setLastStepIndex(0)
+        if (!silent) {
+            state = state.copy(loading = true, errorMessage = null)
+        }
         scope.launch {
             try {
                 val session = apiFactory(state.endpoint.trim()).getSession(credential.accessToken, sessionId)
-                withContext(Dispatchers.IO) { runCatching { cache.writeSession(sessionId, StudyJsonCodec.encodeSession(session)) } }
+                withContext(ioDispatcher) { runCatching { cache.writeSession(sessionId, StudyJsonCodec.encodeSession(session)) } }
                 state = state.copy(
                     destination = WatchDestination.QUESTIONS,
                     activeSession = session,
@@ -182,13 +307,14 @@ class WatchController internal constructor(
                     offline = false,
                     errorMessage = null,
                 )
+                schedulePollingIfNeeded()
             } catch (failure: Exception) {
                 if (isAuthorizationFailure(failure)) {
                     handleUnauthorized()
                     return@launch
                 }
                 val cached = if (failure.isConnectivityFailure()) {
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         runCatching { cache.readSession(sessionId)?.let(StudyJsonCodec::decodeSession) }.getOrNull()
                     }
                 } else null
@@ -205,23 +331,29 @@ class WatchController internal constructor(
                 } else {
                     state = state.copy(loading = false, errorMessage = safeMessage(failure))
                 }
+                cancelPolling()
             }
         }
     }
 
-    fun openQuestion(sessionId: String, ordinal: Int) {
+    fun openQuestion(sessionId: String, ordinal: Int, initialStepIndex: Int = 0) {
         val credential = credentialStore.read() ?: return requirePairing()
+        cancelPolling()
+        preferences.setLastSessionId(sessionId)
+        preferences.setLastQuestionOrdinal(ordinal)
         state = state.copy(loading = true, errorMessage = null)
         scope.launch {
             try {
                 val detail = apiFactory(state.endpoint.trim()).getQuestion(credential.accessToken, sessionId, ordinal)
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     runCatching { cache.writeQuestion(sessionId, ordinal, StudyJsonCodec.encodeQuestion(detail)) }
                 }
+                val boundedStep = initialStepIndex.coerceIn(0, (detail.steps.size - 1).coerceAtLeast(0))
+                preferences.setLastStepIndex(boundedStep)
                 state = state.copy(
                     destination = WatchDestination.QUESTION,
                     activeQuestion = detail,
-                    stepIndex = 0,
+                    stepIndex = boundedStep,
                     loading = false,
                     offline = false,
                     errorMessage = null,
@@ -232,17 +364,19 @@ class WatchController internal constructor(
                     return@launch
                 }
                 val cached = if (failure.isConnectivityFailure()) {
-                    withContext(Dispatchers.IO) {
+                    withContext(ioDispatcher) {
                         runCatching {
                             cache.readQuestion(sessionId, ordinal)?.let(StudyJsonCodec::decodeQuestion)
                         }.getOrNull()
                     }
                 } else null
                 if (cached != null) {
+                    val boundedStep = initialStepIndex.coerceIn(0, (cached.steps.size - 1).coerceAtLeast(0))
+                    preferences.setLastStepIndex(boundedStep)
                     state = state.copy(
                         destination = WatchDestination.QUESTION,
                         activeQuestion = cached,
-                        stepIndex = 0,
+                        stepIndex = boundedStep,
                         loading = false,
                         offline = true,
                         errorMessage = null,
@@ -255,34 +389,56 @@ class WatchController internal constructor(
     }
 
     fun previousStep() {
-        state = state.copy(stepIndex = (state.stepIndex - 1).coerceAtLeast(0))
+        val next = (state.stepIndex - 1).coerceAtLeast(0)
+        preferences.setLastStepIndex(next)
+        state = state.copy(stepIndex = next)
     }
 
     fun nextStep() {
         val lastIndex = (state.activeQuestion?.steps?.lastIndex ?: 0).coerceAtLeast(0)
-        state = state.copy(stepIndex = (state.stepIndex + 1).coerceAtMost(lastIndex))
+        val next = (state.stepIndex + 1).coerceAtMost(lastIndex)
+        preferences.setLastStepIndex(next)
+        state = state.copy(stepIndex = next)
     }
 
     fun backToQuestions() {
+        val sessionId = state.activeSession?.summary?.id ?: preferences.getLastSessionId()
+        preferences.setLastQuestionOrdinal(null)
+        preferences.setLastStepIndex(0)
+        if (state.activeSession == null && sessionId != null) {
+            openSession(sessionId)
+            return
+        }
         state = state.copy(destination = WatchDestination.QUESTIONS, activeQuestion = null, stepIndex = 0)
+        schedulePollingIfNeeded()
     }
 
     fun backToSessions() {
+        preferences.clearNavigation()
         state = state.copy(destination = WatchDestination.SESSIONS, activeQuestion = null, activeSession = null)
+        if (state.sessions.isEmpty()) {
+            loadSessions()
+        } else {
+            schedulePollingIfNeeded()
+        }
     }
 
     fun deleteSession(sessionId: String) {
         val credential = credentialStore.read() ?: return requirePairing()
+        cancelPolling()
         state = state.copy(loading = true, errorMessage = null)
         scope.launch {
             try {
                 apiFactory(state.endpoint.trim()).deleteSession(credential.accessToken, sessionId)
                 val remainingSessions = state.sessions.filterNot { it.id == sessionId }
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     runCatching {
                         cache.deleteSession(sessionId)
                         cache.writeSessionList(StudyJsonCodec.encodeSessionList(remainingSessions))
                     }.onFailure { cache.clear() }
+                }
+                if (preferences.getLastSessionId() == sessionId) {
+                    preferences.clearNavigation()
                 }
                 val activeSession = state.activeSession?.takeUnless { it.summary.id == sessionId }
                 state = state.copy(
@@ -294,6 +450,7 @@ class WatchController internal constructor(
                     offline = false,
                     errorMessage = null,
                 )
+                schedulePollingIfNeeded()
             } catch (failure: Exception) {
                 if (isAuthorizationFailure(failure)) {
                     handleUnauthorized()
@@ -306,12 +463,12 @@ class WatchController internal constructor(
 
     fun revokeDevice() {
         val credential = credentialStore.read() ?: return requirePairing()
+        cancelPolling()
         state = state.copy(loading = true, errorMessage = null)
         scope.launch {
             try {
                 apiFactory(state.endpoint.trim()).revokeDevice(credential.accessToken)
-                credentialStore.clear()
-                withContext(Dispatchers.IO) { cache.clear() }
+                invalidateDevice()
                 state = WatchUiState(
                     destination = WatchDestination.PAIRING,
                     endpoint = state.endpoint,
@@ -327,9 +484,77 @@ class WatchController internal constructor(
         }
     }
 
-    fun close() = scope.cancel()
+    fun close() {
+        cancelPolling()
+        scope.cancel()
+    }
+
+    private fun schedulePollingIfNeeded() {
+        if (!foregroundActive || state.offline || pollIntervalsMillis.isEmpty()) {
+            cancelPolling()
+            return
+        }
+        val shouldPoll = when (state.destination) {
+            WatchDestination.SESSIONS -> state.sessions.any { it.status.isInProgress() }
+            WatchDestination.QUESTIONS -> state.activeSession?.let { session ->
+                session.summary.status.isInProgress() || session.questions.any { it.status.isInProgress() }
+            } == true
+            WatchDestination.PAIRING, WatchDestination.QUESTION -> false
+        }
+        if (!shouldPoll) {
+            cancelPolling()
+            return
+        }
+        if (pollingJob?.isActive == true) return
+        pollingJob = scope.launch {
+            var attempt = 0
+            while (foregroundActive && !state.offline) {
+                val delayMs = pollIntervalsMillis[attempt.coerceAtMost(pollIntervalsMillis.lastIndex)]
+                delay(delayMs)
+                if (!foregroundActive || state.offline) break
+                attempt += 1
+                when (state.destination) {
+                    WatchDestination.SESSIONS -> refreshSessionsDuringPoll()
+                    WatchDestination.QUESTIONS -> state.activeSession?.summary?.id?.let { refreshSessionDuringPoll(it) }
+                    else -> break
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshSessionsDuringPoll() {
+        val credential = credentialStore.read() ?: return
+        runCatching {
+            val result = apiFactory(state.endpoint.trim()).listSessions(credential.accessToken)
+            withContext(ioDispatcher) { runCatching { cache.writeSessionList(StudyJsonCodec.encodeSessionList(result)) } }
+            state = state.copy(sessions = result, offline = false, errorMessage = null)
+            if (result.none { it.status.isInProgress() }) cancelPolling()
+        }.onFailure { failure ->
+            if (failure is Exception && isAuthorizationFailure(failure)) handleUnauthorized()
+        }
+    }
+
+    private suspend fun refreshSessionDuringPoll(sessionId: String) {
+        val credential = credentialStore.read() ?: return
+        runCatching {
+            val session = apiFactory(state.endpoint.trim()).getSession(credential.accessToken, sessionId)
+            withContext(ioDispatcher) { runCatching { cache.writeSession(sessionId, StudyJsonCodec.encodeSession(session)) } }
+            state = state.copy(activeSession = session, offline = false, errorMessage = null)
+            val stillRunning = session.summary.status.isInProgress() ||
+                session.questions.any { it.status.isInProgress() }
+            if (!stillRunning) cancelPolling()
+        }.onFailure { failure ->
+            if (failure is Exception && isAuthorizationFailure(failure)) handleUnauthorized()
+        }
+    }
+
+    private fun cancelPolling() {
+        pollingJob?.cancel()
+        pollingJob = null
+    }
 
     private suspend fun handleUnauthorized() {
+        cancelPolling()
         invalidateDevice()
         state = state.copy(
             destination = WatchDestination.PAIRING,
@@ -344,12 +569,29 @@ class WatchController internal constructor(
 
     private suspend fun invalidateDevice() {
         credentialStore.clear()
-        withContext(Dispatchers.IO) { cache.clear() }
+        preferences.clearNavigation()
+        withContext(ioDispatcher) { cache.clear() }
     }
 
     private fun requirePairing() {
+        cancelPolling()
         state = state.copy(destination = WatchDestination.PAIRING, errorMessage = "Vincule o relógio para continuar.")
     }
+
+    private fun SessionStatus.isInProgress(): Boolean =
+        this == SessionStatus.CREATED ||
+            this == SessionStatus.COLLECTING ||
+            this == SessionStatus.QUEUED ||
+            this == SessionStatus.PROCESSING
+
+    private fun QuestionStatus.isInProgress(): Boolean =
+        this == QuestionStatus.UPLOADED ||
+            this == QuestionStatus.VALIDATING ||
+            this == QuestionStatus.INTERPRETING ||
+            this == QuestionStatus.SOLVING
+
+    private fun normalizeCodeInput(value: String): String =
+        value.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.uppercase().take(12)
 
     private fun isAuthorizationFailure(error: Exception): Boolean =
         error is WatchApiFailure.Unauthorized || error is WatchApiFailure.Forbidden
@@ -361,8 +603,6 @@ class WatchController internal constructor(
         (error as? WatchApiFailure)?.message ?: "Não foi possível concluir. Verifique os dados e tente novamente."
 
     private companion object {
-        const val ENDPOINT_PREFS = "watch_ai_endpoint"
-        const val KEY_ENDPOINT = "base_url"
         const val READ_SCOPE = "sessions:read"
         const val MIN_TOKEN_LENGTH = 32
     }
@@ -390,7 +630,7 @@ fun WatchAiApp(controller: WatchController) {
                 onOpenSession = controller::openSession,
                 onDeleteSession = controller::deleteSession,
                 onPairDevice = controller::showPairing,
-                onRetry = controller::loadSessions,
+                onRetry = { controller.loadSessions() },
                 onRevokeDevice = controller::revokeDevice,
             )
             WatchDestination.QUESTIONS -> current.activeSession?.let { session ->
@@ -401,6 +641,7 @@ fun WatchAiApp(controller: WatchController) {
                     onBack = controller::backToSessions,
                     loading = current.loading,
                     errorMessage = current.errorMessage,
+                    onRetry = { controller.openSession(session.summary.id) },
                 )
             }
             WatchDestination.QUESTION -> current.activeQuestion?.let { detail ->

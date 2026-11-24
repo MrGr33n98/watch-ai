@@ -64,7 +64,15 @@ fun PairingScreen(
             )
         }
         item(key = "endpoint-input", contentType = "input") {
-            InputBox(endpoint, "Endereço HTTPS", KeyboardType.Uri, this, transformationSpec, onEndpointChange)
+            InputBox(
+                value = endpoint,
+                label = "Endereço HTTPS",
+                placeholder = "https://seu-servidor",
+                keyboardType = KeyboardType.Uri,
+                itemScope = this,
+                transformationSpec = transformationSpec,
+                onValueChange = onEndpointChange,
+            )
         }
         item(key = "code-label", contentType = "label") {
             WearTextItem(
@@ -78,11 +86,12 @@ fun PairingScreen(
         }
         item(key = "code-input", contentType = "input") {
             InputBox(
-                pairingCode,
-                "Código temporário",
-                KeyboardType.Ascii,
-                this,
-                transformationSpec,
+                value = pairingCode,
+                label = "Código temporário",
+                placeholder = "Ex: A7K9M2P4",
+                keyboardType = KeyboardType.Ascii,
+                itemScope = this,
+                transformationSpec = transformationSpec,
             ) { input -> onPairingCodeChange(input.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.take(12)) }
         }
         if (errorMessage != null) {
@@ -97,7 +106,8 @@ fun PairingScreen(
                 transformationSpec = transformationSpec,
                 itemScope = this,
                 onClick = onPair,
-                enabled = !busy && endpoint.startsWith("https://", ignoreCase = true) && pairingCode.length in 6..12,
+                enabled = !busy && endpoint.startsWith("https://", ignoreCase = true) &&
+                    pairingCode.replace("-", "").length in 6..12,
             )
         }
     }
@@ -107,6 +117,7 @@ fun PairingScreen(
 private fun InputBox(
     value: String,
     label: String,
+    placeholder: String,
     keyboardType: KeyboardType,
     itemScope: androidx.wear.compose.foundation.lazy.TransformingLazyColumnItemScope,
     transformationSpec: androidx.wear.compose.material3.lazy.TransformationSpec,
@@ -121,6 +132,13 @@ private fun InputBox(
             .padding(horizontal = 10.dp, vertical = 12.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
+        if (value.isEmpty()) {
+            Text(
+                text = placeholder,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+            )
+        }
         BasicTextField(
             value = value,
             onValueChange = onValueChange,

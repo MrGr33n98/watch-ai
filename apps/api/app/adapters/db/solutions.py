@@ -80,6 +80,7 @@ class SqlAlchemySolutionRepository:
                         title=domain_step.title,
                         plain_text=domain_step.plain_text,
                         latex=domain_step.latex,
+                        render_url=domain_step.render_url,
                         alt_text=domain_step.alt_text,
                         verified=domain_step.verified if verified else False,
                     )

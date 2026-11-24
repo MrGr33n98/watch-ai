@@ -1,7 +1,9 @@
 import os
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from pathlib import Path
 from typing import cast
 
 from fastapi import FastAPI, Request
@@ -13,17 +15,22 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.adapters.db.batches import SqlAlchemyBatchRepository
 from app.adapters.db.ingestion import SqlAlchemyUnitOfWorkFactory
 from app.adapters.db.telemetry import SqlAlchemyMonthlyModelBudget
+from app.adapters.http.admin import router as admin_router
 from app.adapters.http.delivery import router as delivery_router
 from app.adapters.http.health import router as health_router
 from app.adapters.http.pairing_rate_limit import PairingRateLimiter
+from app.adapters.http.phone_ui import router as phone_ui_router
 from app.adapters.http.watch_api import router as watch_router
 from app.adapters.openrouter.provider import OpenRouterVisionProvider
+from app.adapters.renderer.formulas import PrivateFormulaAssetStore
 from app.adapters.storage.private_media import PrivateMediaStore
 from app.adapters.waha.media import WahaMediaDownloader
+from app.adapters.waha.replies import WahaReplyClient
 from app.adapters.waha.webhook import (
     InboundMessageIngestor,
     WahaBatchCoordinator,
     WahaJpegDownloader,
+    WahaTextReplier,
     WahaWebhookSettings,
 )
 from app.adapters.waha.webhook import (
@@ -39,6 +46,7 @@ from app.infrastructure.telemetry import (
     RequestMetrics,
     RequestTelemetryMiddleware,
 )
+from app.worker import OutboxWorkerService, build_worker_from_environment
 
 
 def create_app(
@@ -50,6 +58,9 @@ def create_app(
     waha_batch_service: WahaBatchCoordinator | None = None,
     waha_media_downloader: WahaJpegDownloader | None = None,
     waha_media_store: AdmittedMediaStorage | None = None,
+    waha_reply_client: WahaTextReplier | None = None,
+    formula_asset_store: PrivateFormulaAssetStore | None = None,
+    admin_api_key: str | None = None,
 ) -> FastAPI:
     environment = app_env
     if environment is None:
@@ -81,18 +92,49 @@ def create_app(
         configured_waha_media_store = PrivateMediaStore(
             configured_waha_settings.media_storage_directory
         )
+    configured_waha_reply_client = waha_reply_client
     if configured_waha_settings.enabled and configured_waha_settings.ready:
         if configured_waha_media_downloader is None:
             configured_waha_media_downloader = WahaMediaDownloader(
                 base_url=configured_waha_settings.media_base_url,
                 api_key=configured_waha_settings.media_api_key,
             )
+        if configured_waha_settings.send_replies and configured_waha_reply_client is None:
+            configured_waha_reply_client = WahaReplyClient(
+                base_url=configured_waha_settings.media_base_url,
+                api_key=configured_waha_settings.media_api_key,
+            )
+    configured_admin_key = (
+        os.getenv("ADMIN_API_KEY", "") if admin_api_key is None else admin_api_key
+    ).strip()
+
+    configured_formula_asset_store = formula_asset_store or PrivateFormulaAssetStore(
+        Path(os.getenv("WATCH_AI_RENDER_DIR", ".watch-ai-private-renders"))
+    )
+    embedded_worker_enabled = (
+        os.getenv("ENABLE_EMBEDDED_WORKER", "false").strip().lower() in {"true", "1", "yes"}
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        worker: OutboxWorkerService | None = None
+        worker_thread: threading.Thread | None = None
+        if embedded_worker_enabled and configured_session_factory is not None:
+            worker = build_worker_from_environment(configured_session_factory)
+            application.state.embedded_worker = worker
+            worker_thread = threading.Thread(
+                target=worker.run_forever,
+                name="watch-ai-outbox-worker",
+                daemon=True,
+            )
+            worker_thread.start()
         try:
             yield
         finally:
+            if worker is not None:
+                worker.stop()
+            if worker_thread is not None:
+                worker_thread.join(timeout=5)
             if engine is not None:
                 engine.dispose()
 
@@ -121,12 +163,18 @@ def create_app(
     application.state.waha_batch_service = configured_waha_batch_service
     application.state.waha_media_downloader = configured_waha_media_downloader
     application.state.waha_media_store = configured_waha_media_store
+    application.state.waha_reply_client = configured_waha_reply_client
+    application.state.admin_api_key = configured_admin_key
+    application.state.formula_asset_store = configured_formula_asset_store
+    application.state.embedded_worker = None
     application.state.session_retention_policy = SessionRetentionPolicy.from_environment()
     application.add_middleware(RequestTelemetryMiddleware, metrics=request_metrics)
     application.include_router(health_router)
     application.include_router(delivery_router)
     application.include_router(watch_router)
     application.include_router(waha_router)
+    application.include_router(admin_router)
+    application.include_router(phone_ui_router)
 
     @application.exception_handler(StarletteHTTPException)
     async def handle_http_exception(

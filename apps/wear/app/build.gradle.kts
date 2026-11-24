@@ -14,6 +14,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val configuredApiUrl = ((project.findProperty("watchAiApiUrl") as String?) ?: "").trim().replace("\"", "")
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"$configuredApiUrl\"")
     }
 
     buildFeatures {

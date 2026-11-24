@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Protocol
 
+from app.adapters.renderer.formulas import FormulaRenderer
 from app.application.ports import VisionProvider
 from app.application.solution_policy import SolutionPolicy
 from app.domain.ingestion.models import InboundMessage
@@ -38,11 +40,13 @@ class SolutionPipeline:
         problem_mapper: SolutionProblemMapper,
         solution_policy: SolutionPolicy,
         result_repository: SolutionResultRepository,
+        formula_renderer: FormulaRenderer | None = None,
     ) -> None:
         self._vision_provider = vision_provider
         self._problem_mapper = problem_mapper
         self._solution_policy = solution_policy
         self._result_repository = result_repository
+        self._formula_renderer = formula_renderer
 
     def process(self, message: InboundMessage, *, image_bytes: bytes) -> SolvedExercise:
         if message.question_ordinal is None:
@@ -62,8 +66,42 @@ class SolutionPipeline:
             except (TypeError, ValueError):
                 result = self._review(message.question_ordinal, exercise.statement)
 
+        result = self._render_steps(message, result)
         self._result_repository.save_solution(message, exercise, result)
         return result
+
+    def _render_steps(self, message: InboundMessage, result: SolvedExercise) -> SolvedExercise:
+        if (
+            self._formula_renderer is None
+            or message.session_id is None
+            or message.question_ordinal is None
+        ):
+            return result
+        rendered_steps: list[SolutionStep] = []
+        for step in result.steps:
+            if step.latex is None:
+                rendered_steps.append(step)
+                continue
+            render_result = self._formula_renderer.render(
+                latex=step.latex,
+                fallback_text=step.plain_text,
+                alt_text=step.alt_text or step.plain_text,
+            )
+            render_url = (
+                f"/v1/sessions/{message.session_id}/questions/{message.question_ordinal}"
+                f"/steps/{step.ordinal}/render"
+                if render_result.rendered and render_result.asset_key is not None
+                else None
+            )
+            rendered_steps.append(
+                replace(
+                    step,
+                    plain_text=render_result.plain_text,
+                    alt_text=render_result.alt_text,
+                    render_url=render_url,
+                )
+            )
+        return replace(result, steps=tuple(rendered_steps))
 
     @staticmethod
     def _review(ordinal: int, statement: str | None) -> SolvedExercise:

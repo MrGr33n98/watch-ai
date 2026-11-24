@@ -82,6 +82,10 @@ def test_watch_routes_are_declared_in_the_openapi_contract() -> None:
         ("/v1/sessions/{session_id}", "get"): "getSession",
         ("/v1/sessions/{session_id}", "delete"): "deleteSession",
         ("/v1/sessions/{session_id}/questions/{ordinal}", "get"): "getQuestion",
+        (
+            "/v1/sessions/{session_id}/questions/{ordinal}/steps/{step_ordinal}/render",
+            "get",
+        ): "renderSolutionStep",
     }
     application_openapi = create_app(app_env="test").openapi()
 

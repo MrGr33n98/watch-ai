@@ -44,9 +44,11 @@ class SessionListScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("4/4 exercícios").assertIsDisplayed()
-        composeRule.onNodeWithText("Pronta").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Abrir sessão, 4 de 4 exercícios").performClick()
+        composeRule.onNodeWithText("4/4 exercícios").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Pronta").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Abrir sessão, 4 de 4 exercícios")
+            .performScrollTo()
+            .performClick()
         composeRule.runOnIdle { assertEquals("session-1", selectedSession) }
     }
 
@@ -112,7 +114,7 @@ class SessionListScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Offline · dados sincronizados").assertIsDisplayed()
+        composeRule.onNodeWithText("Offline · dados sincronizados").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Nenhuma sessão sincronizada").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Parear relógio").performScrollTo().assertIsDisplayed()
     }

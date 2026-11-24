@@ -46,3 +46,19 @@ def test_unknown_unit_text_is_not_parsed_as_an_expression() -> None:
             PhysicalQuantity(Decimal("1"), "__import__('os')"),
             target_unit="W",
         )
+
+
+def test_extended_study_units_convert_with_exact_decimal_values() -> None:
+    speed = DimensionalVerifier().convert(
+        PhysicalQuantity(Decimal("72"), "km/h"),
+        target_unit="m/s",
+    )
+    energy = DimensionalVerifier().convert(
+        PhysicalQuantity(Decimal("2.5"), "kJ"),
+        target_unit="J",
+    )
+
+    assert speed.value == Decimal("20")
+    assert speed.unit == "m/s"
+    assert energy.value == Decimal("2500")
+    assert energy.unit == "J"

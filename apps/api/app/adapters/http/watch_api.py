@@ -9,6 +9,7 @@ from app.adapters.db.retention import SqlAlchemySessionRetentionRepository
 from app.adapters.db.session_queries import SqlAlchemySessionQueryRepository
 from app.adapters.http.auth import WatchPrincipal, require_watch_principal
 from app.adapters.http.database import DatabaseSession
+from app.adapters.renderer.formulas import FormulaRenderer, PrivateFormulaAssetStore
 from app.application.retention import SessionRetentionService
 from app.application.session_queries import SessionQueries
 
@@ -157,3 +158,54 @@ def get_question(
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
     return QuestionDetailResponse.model_validate(result)
+
+
+@router.get(
+    "/{session_id}/questions/{ordinal}/steps/{step_ordinal}/render",
+    operation_id="renderSolutionStep",
+    responses={
+        200: {"content": {"image/svg+xml": {}}, "description": "Rendered formula SVG"},
+        401: {"model": ApiErrorResponse, "description": "Unauthorized"},
+        404: {"model": ApiErrorResponse, "description": "Not found"},
+    },
+)
+def render_solution_step(
+    session_id: UUID,
+    ordinal: Annotated[int, Path(ge=1, le=4)],
+    step_ordinal: Annotated[int, Path(ge=1, le=20)],
+    request: Request,
+    database: DatabaseSession,
+    principal: Annotated[WatchPrincipal, Depends(require_watch_principal)],
+) -> Response:
+    queries = SessionQueries(SqlAlchemySessionQueryRepository(database))
+    result = queries.get_question(principal.user_id, session_id, ordinal)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    step = next((item for item in result.steps if item.ordinal == step_ordinal), None)
+    if step is None or step.latex is None or step.render_url is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Formula render not found",
+        )
+    asset_store: PrivateFormulaAssetStore = request.app.state.formula_asset_store
+    renderer = FormulaRenderer(asset_store)
+    rendered = renderer.render(
+        latex=step.latex,
+        fallback_text=step.plain_text,
+        alt_text=step.alt_text or step.plain_text,
+    )
+    if not rendered.rendered or rendered.asset_key is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Formula render not found",
+        )
+    svg_bytes = asset_store.path_for(rendered.asset_key).read_bytes()
+    return Response(
+        content=svg_bytes,
+        media_type="image/svg+xml",
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cache-Control": "private, max-age=86400",
+        },
+    )

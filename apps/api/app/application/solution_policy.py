@@ -40,6 +40,10 @@ class SolutionPolicy:
                     return self._solve_integral(problem)
                 case ExerciseOperation.UNIT_CONVERSION:
                     return self._solve_conversion(problem)
+                case ExerciseOperation.SIMPLIFY:
+                    return self._solve_simplify(problem)
+                case ExerciseOperation.SOLVE_EQUATION:
+                    return self._solve_equation(problem)
                 case _:
                     return self._review(problem, "unsupported_operation")
         except (UnsupportedMathInput, UnsupportedUnitInput, ArithmeticError, ValueError):
@@ -140,7 +144,7 @@ class SolutionPolicy:
                     SolutionStepKind.FORMULA,
                     "Operação",
                     f"Derivar em relação a {problem.variable}: {problem.expression}",
-                    None,
+                    rf"\frac{{d}}{{d{problem.variable}}}\left({problem.expression}\right)",
                     False,
                 ),
                 (
@@ -197,7 +201,16 @@ class SolutionPolicy:
                     None,
                     False,
                 ),
-                (SolutionStepKind.FORMULA, "Integral definida", integral, None, False),
+                (
+                    SolutionStepKind.FORMULA,
+                    "Integral definida",
+                    integral,
+                    (
+                        rf"\int_{{{problem.lower}}}^{{{problem.upper}}} "
+                        rf"{problem.expression} \, d{problem.variable}"
+                    ),
+                    False,
+                ),
                 (SolutionStepKind.SUBSTITUTION, "Integrando", problem.expression, None, False),
                 (SolutionStepKind.CALCULATION, "Cálculo", answer, None, True),
                 (
@@ -262,6 +275,99 @@ class SolutionPolicy:
                     None,
                     True,
                 ),
+            ),
+        )
+
+    def _solve_simplify(self, problem: SolutionProblem) -> SolvedExercise:
+        if problem.expression is None:
+            return self._review(problem, "missing_data")
+        result = self._symbolic.simplify(problem.expression)
+        answer = result.result
+        return self._ready(
+            problem,
+            answer,
+            None,
+            (
+                (SolutionStepKind.STATEMENT, "Enunciado", problem.statement, None, False),
+                (
+                    SolutionStepKind.IDENTIFY,
+                    "Identificar dados",
+                    f"Expressão: {problem.expression}",
+                    None,
+                    False,
+                ),
+                (
+                    SolutionStepKind.FORMULA,
+                    "Simplificação algébrica",
+                    problem.expression,
+                    problem.expression,
+                    False,
+                ),
+                (
+                    SolutionStepKind.SUBSTITUTION,
+                    "Forma reduzida",
+                    f"{problem.expression} = {answer}",
+                    None,
+                    False,
+                ),
+                (SolutionStepKind.CALCULATION, "Cálculo", answer, None, True),
+                (
+                    SolutionStepKind.VERIFICATION,
+                    "Verificação simbólica",
+                    "SymPy simplificou a expressão simbolicamente.",
+                    None,
+                    True,
+                ),
+                (SolutionStepKind.RESULT, "Resultado", answer, None, True),
+            ),
+        )
+
+    def _solve_equation(self, problem: SolutionProblem) -> SolvedExercise:
+        if problem.expression is None or problem.rhs is None or problem.variable is None:
+            return self._review(problem, "missing_data")
+        result = self._symbolic.solve_equation(
+            problem.expression,
+            problem.rhs,
+            variable=problem.variable,
+        )
+        answer = result.result
+        equation_text = f"{problem.expression} = {problem.rhs}"
+        return self._ready(
+            problem,
+            answer,
+            None,
+            (
+                (SolutionStepKind.STATEMENT, "Enunciado", problem.statement, None, False),
+                (
+                    SolutionStepKind.IDENTIFY,
+                    "Identificar dados",
+                    f"Incógnita: {problem.variable}; equação: {equation_text}",
+                    None,
+                    False,
+                ),
+                (
+                    SolutionStepKind.FORMULA,
+                    "Equação",
+                    equation_text,
+                    equation_text,
+                    False,
+                ),
+                (
+                    SolutionStepKind.SUBSTITUTION,
+                    "Forma normalizada",
+                    f"({problem.expression}) - ({problem.rhs}) = 0",
+                    None,
+                    False,
+                ),
+                (SolutionStepKind.CALCULATION, "Cálculo", answer, None, True),
+                (
+                    SolutionStepKind.VERIFICATION,
+                    "Verificação simbólica",
+                    "SymPy resolveu e verificou a raiz por substituição.",
+                    None,
+                    True,
+                ),
+                (SolutionStepKind.RESULT, "Resultado", answer, None, True),
             ),
         )
 
