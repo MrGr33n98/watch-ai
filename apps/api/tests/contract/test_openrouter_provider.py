@@ -157,3 +157,24 @@ def test_openrouter_parses_structured_math_extraction_payload() -> None:
     assert result.operation == "fourier"
     assert result.parameters["k"].value == "1,2"
     assert result.parameters["k"].unit == "W/(m K)"
+
+
+def test_openrouter_parses_markdown_fenced_json_object() -> None:
+    payload_json = json.dumps(
+        {
+            "statement": "2+2",
+            "problem_type": "simplify",
+            "confidence": "high",
+            "needs_review": False,
+            "operation": "simplify",
+            "expression": "2 + 2",
+        }
+    )
+    fenced = f"```json\n{payload_json}\n```"
+    provider = provider_for(lambda _: make_response(fenced))
+    result = provider.interpret(make_message(), image_bytes=b"private-jpeg")
+    provider.close()
+
+    assert result.statement == "2+2"
+    assert result.operation == "simplify"
+    assert result.expression == "2 + 2"

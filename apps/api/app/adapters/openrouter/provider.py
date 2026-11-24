@@ -184,7 +184,7 @@ class OpenRouterVisionProvider:
             content = response_body["choices"][0]["message"]["content"]
             if not isinstance(content, str):
                 raise TypeError("Assistant content is not text")
-            payload = _InterpretationPayload.model_validate_json(content)
+            payload = _InterpretationPayload.model_validate_json(_strip_json_fence(content))
             parameters = {
                 name: ExtractedQuantity(value=item.value, unit=item.unit)
                 for name, item in (payload.parameters or {}).items()
@@ -286,3 +286,13 @@ class OpenRouterVisionProvider:
     def _backoff_delay(self, attempt: int) -> float:
         delay: float = self._backoff_seconds * pow(2.0, attempt)
         return min(delay, MAX_RETRY_DELAY_SECONDS)
+
+
+def _strip_json_fence(raw: str) -> str:
+    stripped = raw.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) >= 3 and lines[-1].strip() == "```":
+        return "\n".join(lines[1:-1]).strip()
+    return stripped
