@@ -2,7 +2,6 @@ package com.watchai.data
 
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
-import mockwebserver3.SocketPolicy
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -29,14 +28,14 @@ class WatchApiClientTest {
 
     @After
     fun tearDown() {
-        server.shutdown()
+        server.close()
     }
 
     @Test
     fun `lists session summaries from the versioned endpoint`() = runBlocking {
         server.enqueue(
-            MockResponse().setBody(
-                """{"items":[{"id":"s1","status":"ready","received_count":4,"expected_count":4,"created_at":"2026-11-23T18:00:00Z"}],"next_cursor":null}""",
+            response(
+                body = """{"items":[{"id":"s1","status":"ready","received_count":4,"expected_count":4,"created_at":"2026-11-23T18:00:00Z"}],"next_cursor":null}""",
             ),
         )
 
@@ -44,13 +43,14 @@ class WatchApiClientTest {
 
         assertEquals("s1", result.single().id)
         val request = server.takeRequest()
-        assertEquals("Bearer test-token", request.getHeader("Authorization"))
-        assertEquals("/v1/sessions?limit=10", request.path)
+        assertEquals("Bearer test-token", request.headers["Authorization"])
+        assertEquals("/v1/sessions", request.url.encodedPath)
+        assertEquals("limit=10", request.url.encodedQuery)
     }
 
     @Test
     fun `maps unauthorized response without exposing response body`() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(401).setBody("sensitive detail"))
+        server.enqueue(response(code = 401, body = "sensitive detail"))
 
         val error = runCatching { api.listSessions(accessToken = "expired") }.exceptionOrNull()
 
@@ -60,7 +60,7 @@ class WatchApiClientTest {
 
     @Test
     fun `maps malformed response to a safe contract error`() = runBlocking {
-        server.enqueue(MockResponse().setBody("not-json"))
+        server.enqueue(response(body = "not-json"))
 
         val error = runCatching { api.listSessions(accessToken = "test-token") }.exceptionOrNull()
 
@@ -69,7 +69,12 @@ class WatchApiClientTest {
 
     @Test
     fun `maps a timed out response to a recoverable timeout`() = runBlocking {
-        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        server.enqueue(
+            MockResponse.Builder()
+                .body("delayed response")
+                .bodyDelay(1, java.util.concurrent.TimeUnit.SECONDS)
+                .build(),
+        )
 
         val error = runCatching { api.listSessions(accessToken = "test-token") }.exceptionOrNull()
 
@@ -79,8 +84,9 @@ class WatchApiClientTest {
     @Test
     fun `pairing exchanges the temporary code and posts no provider credential`() = runBlocking {
         server.enqueue(
-            MockResponse().setResponseCode(201).setBody(
-                """{"device_id":"00000000-0000-4000-8000-000000000001","access_token":"opaque-watch-token-12345678901234567890","token_type":"Bearer","scope":"sessions:read","expires_at":"2026-11-24T18:00:00Z"}""",
+            response(
+                code = 201,
+                body = """{"device_id":"00000000-0000-4000-8000-000000000001","access_token":"opaque-watch-token-12345678901234567890","token_type":"Bearer","scope":"sessions:read","expires_at":"2026-11-24T18:00:00Z"}""",
             ),
         )
 
@@ -89,34 +95,40 @@ class WatchApiClientTest {
         assertEquals("opaque-watch-token-12345678901234567890", paired.accessToken)
         val request = server.takeRequest()
         assertEquals("POST", request.method)
-        assertEquals("/v1/device-pairings", request.path)
-        val requestBody = request.body.readUtf8()
+        assertEquals("/v1/device-pairings", request.url.encodedPath)
+        val requestBody = requireNotNull(request.body).utf8()
         assertTrue(requestBody.contains("12345678"))
         assertTrue(!requestBody.contains("sk-or-"))
     }
 
     @Test
     fun `revocation sends bearer credential to the device revoke route`() = runBlocking {
-        server.enqueue(MockResponse().setResponseCode(204))
+        server.enqueue(response(code = 204))
 
         api.revokeDevice("opaque-watch-token")
 
         val request = server.takeRequest()
         assertEquals("DELETE", request.method)
-        assertEquals("/v1/devices/me", request.path)
-        assertEquals("Bearer opaque-watch-token", request.getHeader("Authorization"))
+        assertEquals("/v1/devices/me", request.url.encodedPath)
+        assertEquals("Bearer opaque-watch-token", request.headers["Authorization"])
     }
 
     @Test
     fun `session deletion sends bearer credential to the owner scoped route`() = runBlocking {
         val sessionId = "00000000-0000-4000-8000-000000000001"
-        server.enqueue(MockResponse().setResponseCode(204))
+        server.enqueue(response(code = 204))
 
         api.deleteSession("opaque-watch-token", sessionId)
 
         val request = server.takeRequest()
         assertEquals("DELETE", request.method)
-        assertEquals("/v1/sessions/$sessionId", request.path)
-        assertEquals("Bearer opaque-watch-token", request.getHeader("Authorization"))
+        assertEquals("/v1/sessions/$sessionId", request.url.encodedPath)
+        assertEquals("Bearer opaque-watch-token", request.headers["Authorization"])
     }
+
+    private fun response(code: Int = 200, body: String = "") =
+        MockResponse.Builder()
+            .code(code)
+            .body(body)
+            .build()
 }
