@@ -1,0 +1,3 @@
+# Prompt 03 — Desenvolvimento TDD / DDD (após discovery aprovado)
+
+Siga o plano e a constituição Watch AI. Comece pela primeira fatia vertical T006-T012. Para cada tarefa: escreva teste determinístico RED, execute, implemente GREEN, refatore e repita testes. Domínio não pode depender de FastAPI/WAHA/OpenRouter; crie ports e adaptadores fake para CI. Faça migrations/constraints, OpenAPI, jobs e idempotência. Preserve 4 questões e estados. Proíba secrets no Git; utilize `.env.example`, `uv.lock`, CI e arquivos de convenções. Ao final de cada slice entregue diffs/paths, logs RED-GREEN, cobertura, riscos, story coverage, pontos ainda não implementados. Sem merge/deploy.

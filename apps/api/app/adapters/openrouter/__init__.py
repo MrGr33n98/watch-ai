@@ -1,0 +1,1 @@
+"""OpenRouter multimodal provider adapter."""

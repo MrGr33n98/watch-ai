@@ -1,0 +1,3 @@
+# Prompt 04 — Wear OS UI (após API fake)
+
+Construa aplicativo Watch AI nativo para Galaxy Watch4 com Kotlin/Compose for Wear OS Material3. Parta de `android/wear-os-samples/ComposeStarter`, revise licença, mas não copie projeto inteiro indiscriminadamente. Crie UI escura circular premium com telas de pareamento, sessões, Q1..Q4, enunciado, passo N/M, notação matemática servida do backend, resposta, erros, cache/offline. Layout adaptativo 40/44mm, toque >=44dp, com a11y, sem áudio. Use API HTTPS direta, não Data Layer ou BLE via iPhone. Entregue testes JUnit/Compose UI/MockWebServer, screenshot diff 40/44mm, ADB install de APK se hardware disponível e logs de execução. Não afirmar que instalou sem `adb devices` e retorno do dispositivo.

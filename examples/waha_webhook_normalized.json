@@ -1,0 +1,14 @@
+{
+  "provider": "waha",
+  "event": "message",
+  "session": "watch-ai-dev",
+  "provider_message_id": "test_msg_0001",
+  "sender_id": "<private sender from allowed list>",
+  "from_me": false,
+  "media": {
+    "url": "http://waha:3000/api/files/authorized_image.jpg",
+    "filename": "Q1.jpg",
+    "mimetype": "image/jpeg"
+  },
+  "_note": "Payload normalizado ilustrativo após ACL; não é payload WAHA original nem deve usar media.url arbitrária."
+}
