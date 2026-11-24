@@ -1100,4 +1100,19 @@ Implemented the remaining phone-and-watch MVP capabilities on `feat/001-watch-ai
 - **Docker Compose build & live E2E smoke (`watch-ai-smoke`, `APP_ENV=development`, `VISION_PROVIDER=fake`)**:
   - Built `api` and `worker` images cleanly, verified `alembic --version` (`alembic 1.20.1`) and `alembic upgrade head`, started `db`, `api`, `worker` (`Healthy`).
   - Exercised `GET /health` (`200`), `GET /phone` (`200`, no admin key leaked), `POST /v1/admin/users` (`201`), `POST /v1/admin/pairings` (`201`, 8-char code), `POST /v1/device-pairings` (`201`, lowercase hyphenated code accepted), `POST /v1/admin/users/{user_id}/batches/upload` with `Q1_synthetic.jpg` and `Q2_synthetic.jpg` (`202`), polled `GET /v1/sessions/{session_id}` until `worker` transitioned session to `needs_review` with 2 steps on Q1 (`Q1_DETAIL_STATUS: needs_review STEPS: 2`), revoked watch via `DELETE /v1/admin/users/{user_id}/devices/{device_id}` (`204`), and verified subsequent `GET /v1/sessions` with the revoked token returned `401` (`COMPOSE_SMOKE_OK`), then ran `docker compose down -v`.
-- **Pending / externally gated**: GitHub Actions execution for the updated `Wear OS CI` / `Backend CI` / `Security Scans` runs on this push, plus physical hardware (`T003`–`T004`) and live external WAHA DEV / OpenRouter credentials (`T005`, `T033`, `T034`).
+
+### GitHub Actions & Wear OS CI Verification — Commit `4ef4245`
+
+Following follow-up Wear fixes (`8ebea94` restoring `class WatchController`, `110151e` adding KVM udev permissions on `ubuntu-24.04`, `f809a48` adding `WearTestScroll.kt` gesture scrolling inside `TransformingLazyColumn` + distinct `PairingScreen` section accessibility text, and `4ef4245` passing `-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true` + explicit PNG header check):
+
+- **All 6 workflow runs on `4ef4245f162c96554ab0ee292c655489ec54f82a` passed (`success`)**:
+  - `Backend CI`: push `45494189224` (`success`), pull_request `45494201799` (`success`)
+  - `Security Scans`: push `45494189354` (`success`), pull_request `45494201904` (`success`)
+  - `Wear OS CI`: push `45494189544` (`success`), pull_request `45494202042` (`success`)
+- **Wear JVM tests (`:app:testDebugUnitTest`)**: `15 tests, 0 failures, 0 skipped` (`WatchControllerTest`: 4, `WatchApiClientTest`: 7, `WatchSessionTest`: 3, `CredentialExpiryTest`: 1).
+- **Wear instrumented UI tests (`:app:connectedDebugAndroidTest` on `android-34;android-wear;x86_64`, `wearos_small_round` with KVM)**: `21 tests, 0 failures, 0 skipped` (`OfflineSessionCacheTest`: 3, `AndroidKeystoreCredentialStoreTest`: 2, `PairingScreenTest`: 1, `QuestionStepsScreenTest`: 10, `SessionListScreenTest`: 5).
+- **Published Wear CI artifacts (`45494189544`)**:
+  - `watch-ai-wear-debug` (artifact `14967463671`, `12,929,768 bytes`) containing `app-debug.apk` and `app-debug.apk.sha256`.
+  - `watch-ai-wear-ui-validation` (artifact `14967438603`, `34,656 bytes`) containing HTML reports and verified `PNG (384, 384)` `watch-ai-question-detail.png` (`23,595 bytes`, SHA-256 `170c2245c29d14482b3c1895961254cbc6f864a0ae5e0117b7b6704c1dfaf475`).
+  - `watch-ai-wear-test-reports` (artifact `14966044312`, `10,377 bytes`).
+- **Remaining externally gated tasks**: physical Y3000/iPhone transfer (`T003`), physical Galaxy Watch4 ADB install/launch (`T004`, physical install portion of `T027`), and authorized external WAHA DEV / OpenRouter live credentials (`T005`, `T033`, `T034`). No PR merge or production deploy performed.

@@ -36,14 +36,14 @@
 
 ## Phase 3: Wear OS Native App
 
-- [ ] T020 [US3] Scaffold apps/wear/ as standalone Kotlin/Compose for Wear OS Material 3 using compatible pinned toolchains; first add a JUnit/Compose test under apps/wear/app/src/test/ and capture RED.
-- [ ] T021 [US5] Add pairing and Android Keystore token storage in apps/wear/app/src/main/; first add tests under apps/wear/app/src/test/ for storage, expiry, clearing, and revocation.
-- [ ] T022 [US3] Add versioned HTTPS DTOs, repository, timeouts, and error mapping in apps/wear/app/src/main/; first add MockWebServer tests under apps/wear/app/src/test/ for success, 401, timeout, and malformed response.
-- [ ] T023 [US3] Build session list and Q1–Q4 states in apps/wear/app/src/main/; first add Compose UI tests under apps/wear/app/src/androidTest/ for empty, loading, processing, ready, partial, and review.
-- [ ] T024 [US3] Build statement/data/formula/substitution/calculation/verification/result steps and previous/next controls in apps/wear/app/src/main/; first add UI tests for every step and accessibility labels.
-- [ ] T025 [US4] Add app-private offline cache, stale indicator, and reconnect behavior in apps/wear/app/src/main/; first add tests for cached read, cache miss, offline, and deletion.
-- [ ] T026 [US3] Verify round safe areas, 40/44 mm, 1.3/1.5 text scale, touch targets, contrast, and no audio permission in apps/wear/app/src/androidTest/; capture screenshots before visual refinements.
-- [ ] T027 [US3] Build debug APK and sanitized emulator screenshots under apps/wear/build/outputs/apk/debug/; record hashes in docs/reports/watch-ai-validation-20261123.md. Mark physical install only with ADB evidence.
+- [X] T020 [US3] Scaffold apps/wear/ as standalone Kotlin/Compose for Wear OS Material 3 using compatible pinned toolchains; first add a JUnit/Compose test under apps/wear/app/src/test/ and capture RED. Verified in Wear OS CI (`45494189544`).
+- [X] T021 [US5] Add pairing and Android Keystore token storage in apps/wear/app/src/main/; first add tests under apps/wear/app/src/test/ for storage, expiry, clearing, and revocation. Verified in Wear OS CI (`45494189544`).
+- [X] T022 [US3] Add versioned HTTPS DTOs, repository, timeouts, and error mapping in apps/wear/app/src/main/; first add MockWebServer tests under apps/wear/app/src/test/ for success, 401, timeout, and malformed response. Verified in Wear OS CI (`45494189544`).
+- [X] T023 [US3] Build session list and Q1–Q4 states in apps/wear/app/src/main/; first add Compose UI tests under apps/wear/app/src/androidTest/ for empty, loading, processing, ready, partial, and review. Verified (`21/21` emulator UI tests in `45494189544`).
+- [X] T024 [US3] Build statement/data/formula/substitution/calculation/verification/result steps and previous/next controls in apps/wear/app/src/main/; first add UI tests for every step and accessibility labels. Verified in `45494189544`.
+- [X] T025 [US4] Add app-private offline cache, stale indicator, and reconnect behavior in apps/wear/app/src/main/; first add tests for cached read, cache miss, offline, and deletion. Verified in `45494189544`.
+- [X] T026 [US3] Verify round safe areas, 40/44 mm, 1.3/1.5 text scale, touch targets, contrast, and no audio permission in apps/wear/app/src/androidTest/; capture screenshots before visual refinements. Verified on API 34 round emulator (`45494189544`).
+- [ ] T027 [US3] PARTIAL — debug APK (`12,929,768 bytes`) and verified PNG emulator screenshot (`384x384`, SHA-256 `170c2245c29d14482b3c1895961254cbc6f864a0ae5e0117b7b6704c1dfaf475`) produced in Wear OS CI (`45494189544`); physical Galaxy Watch4 ADB install remains pending physical device.
 
 ## Phase 4: WhatsApp and WAHA Adapter
 
@@ -58,12 +58,12 @@
 ## Phase 5: Security, CI, and Release Readiness
 
 - [X] T035 [US5] Test 401/403, ownership, revocation, replay, SSRF, hostile images, prompt injection, and APK secrets in apps/api/tests/security/ and apps/wear/; record actual scanner results. Evidence: docs/reports/watch-ai-validation-20261123.md.
-- [ ] T036 [US6] PARTIAL — API deletion/retention, owner/admin remote device revocation, and Wear cache-delete flow are implemented; PostgreSQL backend checks pass (157 passed, 0 skipped). Wear unit/instrumentation execution awaits the updated GitHub Actions Wear OS CI run. Evidence: docs/reports/watch-ai-validation-20261123.md.
+- [X] T036 [US6] API deletion/retention, owner/admin remote device revocation, and Wear cache-delete flow verified across PostgreSQL (`157 passed, 0 skipped`) and Wear OS CI (`45494189544`). Evidence: docs/reports/watch-ai-validation-20261123.md.
 - [X] T037 Add correlation IDs, redacted structured logs, durable monthly model-cost accounting, and request metrics in apps/api/app/infrastructure/; first add apps/api/tests/unit/test_redacted_telemetry.py asserting private data is absent. Evidence: docs/reports/watch-ai-validation-20261123.md.
-- [ ] T038 PARTIAL — Backend CI, PostgreSQL checks, Compose live smoke, and Wear workflow contract pass locally; `.github/workflows/wear-ci.yml` now targets channel-0 emulator `api-level: 34` (`android-wear`) with fixed UI/cache test selectors awaiting GitHub Actions validation on push. Evidence: docs/reports/watch-ai-validation-20261123.md.
-- [ ] T039 PARTIAL — measured async-ingestion latency, Docker worker processing, and updated Wear accessibility/offline/polling sources are verified on the backend; Wear emulator instrumentation execution awaits GitHub Actions validation. Evidence: docs/reports/watch-ai-validation-20261123.md.
+- [X] T038 Backend CI (`45494189224`), Security Scans (`45494189354`), and Wear OS CI (`45494189544`) all passed on PR #1 (`4ef4245`), including API 34 `wearos_small_round` emulator UI tests with KVM, debug APK, and verified screenshot artifacts. Evidence: docs/reports/watch-ai-validation-20261123.md.
+- [X] T039 Async-ingestion performance measured locally, Docker worker live smoke passed, and Wear accessibility/offline/round-size instrumentation cases passed (`21/21` in Wear OS CI `45494189544`). Evidence: docs/reports/watch-ai-validation-20261123.md.
 - [X] T040 Document isolated deploy, expand/contract migrations, retention, secrets, backup, incident response, and rollback in docs/09_ENV_RUNBOOK.md and infra/README.md; align the runtime image with Alembic and pass the monthly budget setting through Compose. Evidence: docs/reports/watch-ai-validation-20261123.md.
-- [ ] T041 PARTIAL — MVP backend + `/phone` console + worker + remote revocation + Docker live smoke are verified (`157 passed`, `0 skipped`); Wear OS CI run on this push will confirm APK/screenshot artifacts while physical hardware and live-provider gates remain pending. No merge or deployment. Evidence: docs/reports/watch-ai-validation-20261123.md.
+- [ ] T041 PARTIAL — software MVP, `/phone` console, async worker, remote revocation, Docker live smoke (`COMPOSE_SMOKE_OK`), and all 6 PR #1 CI checks (`4ef4245`) passed; physical watch ADB install (`T004`/`T027`) and live provider credentials (`T003`/`T005`/`T033`–`T034`) remain external user gates. No merge or deployment. Evidence: docs/reports/watch-ai-validation-20261123.md.
 
 ## Dependency Order
 
