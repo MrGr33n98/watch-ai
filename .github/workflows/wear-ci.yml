@@ -56,14 +56,26 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Enable KVM group permissions
+        run: |
+          if [ -e /dev/kvm ]; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger --name-match=kvm
+            sudo chmod 666 /dev/kvm || true
+          fi
+          ls -la /dev/kvm || true
+
       - name: Run Wear UI tests on a round emulator
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
         with:
           api-level: 34
           target: android-wear
           arch: x86_64
           profile: wearos_small_round
-          emulator-boot-timeout: 900
+          emulator-boot-timeout: 600
           disable-animations: true
           working-directory: apps/wear
           script: |
