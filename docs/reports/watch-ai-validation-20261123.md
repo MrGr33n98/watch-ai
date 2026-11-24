@@ -888,7 +888,15 @@ uv pip install --python .venv/bin/python pip-audit
 
 Observed: `No known vulnerabilities found`. The CI job's `setup-python` installs a regular Python distribution and runs the equivalent `uvx` scanner command; the workflow itself was not triggered on GitHub from this workspace.
 
-**T038 status**: partial. Backend test/lint/type and the locked dependency audit passed locally; YAML and action pins are covered by the contract test. The Android workflow was not executed because this machine still lacks Java/Gradle/Android SDK, so no APK artifact is claimed. Gitleaks was not executed in a GitHub Actions checkout with commit history/token; existing local security regression/static source scan evidence remains under T035. No GitHub workflow run was triggered, and no external model/provider credentials were used.
+**T038 status at first PR run**: partial. GitHub Actions for commit
+`6d2b74ff2b1c977676d4ce5c4916296908ab95a1` completed Backend CI successfully,
+including tests, Ruff, mypy, and coverage artifact upload. Both Security Scans
+jobs passed: Gitleaks history scan and `pip-audit`. Wear OS CI failed in SDK
+setup before invoking Gradle because `sdkmanager` reported that
+`platforms;android-37` was not found. The Android platform release list
+documents Android 16/API 36; the app/workflow have been changed to API 36, and
+the workflow now also compiles `androidTest` Kotlin sources. The corrected
+GitHub run is pending. No real provider credentials were used.
 
 ### T039 — Performance, accessibility, offline, and regression coverage
 
@@ -977,8 +985,12 @@ merge, or production action was performed. The 16 PostgreSQL tests remain
 skipped pending an explicitly disposable test database.
 
 The latest backend regression evidence remains `122 passed, 16 skipped, 1
-warning`; Ruff, mypy, Compose config, and pack validation passed. A draft PR is
-the requested review handoff; it does not represent release readiness. T041
-remains partial until the branch is pushed and the draft is open; device-loss
-revocation, APK/screenshots, Android execution, and live-provider checks remain
-pending regardless of PR status.
+warning`; Ruff, mypy, Compose config, and pack validation passed. The first CI
+run for draft PR [#1](https://github.com/MrGr33n98/watch-ai/pull/1) passed
+Backend CI and Security Scans. Wear CI failed before Gradle because API 37 was
+unavailable in the SDK repository; this branch now targets API 36, and the
+corrected run is pending. The draft remains a review handoff, not release
+readiness. T041 remains partial because no APK/screenshots exist to attach and
+Android execution is unavailable locally; device-loss revocation, PostgreSQL
+integration, and live-provider checks also remain pending regardless of PR
+status. No merge or deployment was performed.

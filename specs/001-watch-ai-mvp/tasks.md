@@ -60,10 +60,10 @@
 - [X] T035 [US5] Test 401/403, ownership, revocation, replay, SSRF, hostile images, prompt injection, and APK secrets in apps/api/tests/security/ and apps/wear/; record actual scanner results. Evidence: docs/reports/watch-ai-validation-20261123.md.
 - [ ] T036 [US6] PARTIAL — API deletion/retention and Wear cache-delete flow are implemented; backend checks pass. Wear unit/instrumentation tests remain BLOCKED on the missing Gradle/Android SDK toolchain. Evidence: docs/reports/watch-ai-validation-20261123.md.
 - [X] T037 Add correlation IDs, redacted structured logs, durable monthly model-cost accounting, and request metrics in apps/api/app/infrastructure/; first add apps/api/tests/unit/test_redacted_telemetry.py asserting private data is absent. Evidence: docs/reports/watch-ai-validation-20261123.md.
-- [ ] T038 PARTIAL — added three SHA-pinned workflows and validated YAML/backend/security jobs locally; Wear build/APK and Gitleaks action remain unexecuted because this environment lacks Android tooling and a GitHub Actions context. Evidence: docs/reports/watch-ai-validation-20261123.md.
+- [ ] T038 PARTIAL — Backend CI, dependency audit, and Gitleaks passed on PR #1. The first Wear run failed before Gradle because SDK Manager lacked API 37; workflow and app now target API 36 and compile androidTest sources, awaiting rerun. Evidence: docs/reports/watch-ai-validation-20261123.md.
 - [ ] T039 PARTIAL — added measured async-ingestion performance coverage and Wear accessibility/offline/round-size instrumentation cases; backend checks passed, but Wear cases remain unexecuted without Android tooling. Evidence: docs/reports/watch-ai-validation-20261123.md.
 - [X] T040 Document isolated deploy, expand/contract migrations, retention, secrets, backup, incident response, and rollback in docs/09_ENV_RUNBOOK.md and infra/README.md; align the runtime image with Alembic and pass the monthly budget setting through Compose. Evidence: docs/reports/watch-ai-validation-20261123.md.
-- [ ] T041 Perform final independent review, refresh docs/reports/watch-ai-validation-20261123.md, attach available screenshots/APK hashes, and prepare draft PR for review without merge or deployment.
+- [ ] T041 PARTIAL — final review and refreshed report are complete; draft PR #1 is open for review. No APK/screenshots exist to attach because Android tooling is unavailable, and hardware/live-provider gates remain pending. No merge or deployment. Evidence: docs/reports/watch-ai-validation-20261123.md.
 
 ## Dependency Order
 

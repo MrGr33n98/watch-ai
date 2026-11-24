@@ -48,7 +48,7 @@ PostgreSQL não foi configurado, portanto os 16 testes que requerem
 | P1 | WAHA e OpenRouter reais não validados. | T033/T034 dependem de sessão WAHA DEV isolada, credenciais e orçamento explicitamente aprovados. |
 | P1 | Deploy público não fornecido pelo repositório. | Compose é loopback-only e não configura TLS ingress, secret manager, backups off-host nem scheduler. |
 | P2 | Limite de gasto não reserva custo para chamadas concorrentes. | `MONTHLY_MODEL_BUDGET_USD` tem preflight/persistência, mas chamadas já em voo podem ultrapassar o limite. |
-| P2 | Workflows ainda não rodaram no GitHub. | YAML, hashes SHA e jobs backend foram revisados localmente; Wear CI e Gitleaks aguardam contexto GitHub. |
+| P1 | CI Wear ainda não passou. | Backend CI, pip-audit e Gitleaks passaram no primeiro PR run. Wear falhou antes do Gradle porque o SDK Manager não encontrou API 37; o branch agora usa API 36 e aguarda nova execução. |
 
 ## Itens da missão ainda pendentes
 
@@ -58,8 +58,9 @@ PostgreSQL não foi configurado, portanto os 16 testes que requerem
   validar acessibilidade visual e produzir APK/screenshot com hashes.
 - T033–T034: integrações reais de WAHA e OpenRouter autorizadas.
 - T036, T038 e T039 continuam parciais conforme `specs/001-watch-ai-mvp/tasks.md`.
-- T041: revisão final e PR draft dependem de publicar o branch; não houve merge ou
-  deploy. Nenhum APK ou screenshot foi gerado.
+- T041: revisão final completa e PR draft aberto em
+  [#1](https://github.com/MrGr33n98/watch-ai/pull/1). Nenhum APK ou screenshot
+  foi gerado. Não houve merge ou deploy.
 
 O relatório anterior de 2026-11-23 descrevia somente o pacote documental antes
 da implementação; as evidências atuais e o histórico dos slices constam no

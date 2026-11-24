@@ -41,6 +41,7 @@ def test_ci_workflows_cover_backend_wear_and_security_without_provider_secrets()
     wear = str(workflows["wear-ci.yml"])
     assert "testDebugUnitTest" in wear
     assert "assembleDebug" in wear
+    assert "compileDebugAndroidTestKotlin" in wear
     assert "upload-artifact" in wear
 
     security = str(workflows["security.yml"])
@@ -50,3 +51,13 @@ def test_ci_workflows_cover_backend_wear_and_security_without_provider_secrets()
     assert "gitleaks/gitleaks-action" in security
     assert "OPENROUTER_API_KEY" not in security
     assert "WAHA_API_KEY" not in security
+
+
+def test_wear_ci_installs_the_stable_sdk_selected_by_the_app() -> None:
+    app_gradle = (REPOSITORY_ROOT / "apps" / "wear" / "app" / "build.gradle.kts").read_text(
+        encoding="utf-8"
+    )
+    wear_workflow = (WORKFLOW_DIRECTORY / "wear-ci.yml").read_text(encoding="utf-8")
+
+    assert "compileSdk = 36" in app_gradle
+    assert 'platforms;android-36 build-tools;36.0.0' in wear_workflow
