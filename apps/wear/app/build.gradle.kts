@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.watchai"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.watchai"
@@ -33,7 +33,7 @@ android {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.06.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
@@ -42,10 +42,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("androidx.wear.compose:compose-foundation:1.7.2")
-    implementation("androidx.wear.compose:compose-material3:1.7.2")
-    implementation("androidx.wear.compose:compose-navigation:1.7.2")
-    implementation("androidx.wear.compose:compose-ui-tooling:1.7.2")
+    implementation("androidx.wear.compose:compose-foundation:1.6.2")
+    implementation("androidx.wear.compose:compose-material3:1.6.2")
+    implementation("androidx.wear.compose:compose-navigation:1.6.2")
+    implementation("androidx.wear.compose:compose-ui-tooling:1.6.2")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.squareup.okhttp3:mockwebserver3:5.3.0")
