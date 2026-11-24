@@ -79,9 +79,10 @@ jobs:
           disable-animations: true
           working-directory: apps/wear
           script: |
-            gradle --no-daemon :app:connectedDebugAndroidTest
+            gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
             mkdir -p build/screenshots
             adb exec-out run-as com.watchai cat files/watch-ai-question-detail.png > build/screenshots/watch-ai-question-detail.png
+            python3 -c 'from pathlib import Path; raw = Path("build/screenshots/watch-ai-question-detail.png").read_bytes(); assert raw.startswith(b"\x89PNG\r\n\x1a\n"), f"Invalid PNG header: {raw[:64]!r}"'
             sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/app-debug.apk.sha256
             sha256sum build/screenshots/watch-ai-question-detail.png > build/screenshots/watch-ai-question-detail.png.sha256
 
