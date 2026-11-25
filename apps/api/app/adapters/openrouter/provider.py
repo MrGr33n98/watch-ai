@@ -272,9 +272,11 @@ class OpenRouterVisionProvider:
                 },
             ],
             "temperature": 0,
-            "max_completion_tokens": 800,
             "response_format": {"type": "json_object"},
         }
+        max_tokens_env = os.environ.get("OPENROUTER_MAX_TOKENS", "").strip()
+        if max_tokens_env.isdigit() and int(max_tokens_env) > 0:
+            request_body["max_completion_tokens"] = int(max_tokens_env)
 
         response = self._post_with_retries(request_body)
         try:
