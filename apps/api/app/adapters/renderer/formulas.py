@@ -29,24 +29,45 @@ _GREEK = {
     "alpha": "α",
     "beta": "β",
     "delta": "δ",
+    "epsilon": "ε",
+    "eta": "η",
     "gamma": "γ",
+    "kappa": "κ",
     "lambda": "λ",
     "mu": "μ",
+    "nu": "ν",
     "omega": "ω",
     "phi": "φ",
     "pi": "π",
+    "rho": "ρ",
     "sigma": "σ",
+    "tau": "τ",
     "theta": "θ",
+    "zeta": "ζ",
 }
 _SIMPLE_COMMANDS = {
+    "approx": "≈",
+    "cap": "∩",
     "cdot": "·",
+    "cup": "∪",
+    "equiv": "≡",
+    "ge": "≥",
+    "geq": "≥",
+    "in": "∈",
     "infty": "∞",
     "int": "∫",
     "le": "≤",
+    "leq": "≤",
     "lim": "lim",
+    "nabla": "∇",
     "neq": "≠",
+    "partial": "∂",
     "pm": "±",
+    "prod": "∏",
+    "quad": "   ",
+    "qquad": "      ",
     "rightarrow": "→",
+    "sum": "∑",
     "times": "×",
     "to": "→",
 }
@@ -248,7 +269,7 @@ class _LatexTextParser:
                 self._position += 1
                 script = self._script_argument()
                 result.append(self._script(marker, script))
-            elif character.isalnum() or character.isspace() or character in "+-=*/(),.[]|":
+            elif character.isalnum() or character.isspace() or character in "+-=*/(),.[]|':;":
                 result.append(character)
                 self._position += 1
             else:
@@ -279,9 +300,19 @@ class _LatexTextParser:
             return _SIMPLE_COMMANDS[name]
         if name in {",", ";", "!", " "}:
             return " " if name in {",", ";", " "} else ""
-        if name in {"left", "right", "limits"}:
+        if name in {"left", "right", "limits", "displaystyle", "textstyle"}:
             return ""
-        if name in {"frac", "sqrt", "mathrm", "text", "dot"}:
+        if name in {
+            "frac",
+            "sqrt",
+            "mathrm",
+            "text",
+            "dot",
+            "ddot",
+            "vec",
+            "boxed",
+            "overline",
+        }:
             argument = self._required_group()
             if name == "frac":
                 denominator = self._required_group()
@@ -290,6 +321,14 @@ class _LatexTextParser:
                 return f"√({argument})"
             if name == "dot":
                 return f"{argument}\u0307"
+            if name == "ddot":
+                return f"{argument}\u0308"
+            if name == "vec":
+                return f"{argument}\u20D7"
+            if name == "boxed":
+                return f"[{argument}]"
+            if name == "overline":
+                return f"¯({argument})"
             return argument
         raise UnsupportedFormula("Formula uses an unsupported LaTeX command")
 

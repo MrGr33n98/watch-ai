@@ -62,17 +62,19 @@ fun QuestionStepsScreen(
                 WearTextItem("Resultado não verificado", transformationSpec, this, MaterialTheme.colorScheme.error)
             }
         }
-        item(key = "statement-heading", contentType = "heading") {
-            WearTextItem("Problema", transformationSpec, this, style = MaterialTheme.typography.titleSmall)
-        }
-        item(key = "statement", contentType = "statement") {
-            WearTextItem(
-                detail.statement,
-                transformationSpec,
-                this,
-                style = MaterialTheme.typography.bodyLarge,
-                accessibilityText = "Enunciado do problema: ${detail.statement}",
-            )
+        if (safeIndex == 0) {
+            item(key = "statement-heading", contentType = "heading") {
+                WearTextItem("Problema", transformationSpec, this, style = MaterialTheme.typography.titleSmall)
+            }
+            item(key = "statement", contentType = "statement") {
+                WearTextItem(
+                    detail.statement,
+                    transformationSpec,
+                    this,
+                    style = MaterialTheme.typography.bodyLarge,
+                    accessibilityText = "Enunciado do problema: ${detail.statement}",
+                )
+            }
         }
 
         if (currentStep != null) {

@@ -15,6 +15,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.domain.ingestion.models import InboundMessage
+from app.domain.interpretation.manifest import DocumentManifest, ManifestQuestion
 from app.domain.interpretation.models import (
     ExtractedQuantity,
     InterpretationConfidence,
@@ -142,6 +143,60 @@ class _InterpretationPayload(BaseModel):
     parameters: dict[str, _ExtractedQuantityPayload] | None = None
 
 
+DOCUMENT_MANIFEST_SYSTEM_PROMPT = """You are an expert educational document analysis agent.
+Analyze the photographed study sheet or exam page and inventory all individual exercises.
+
+Rules:
+1. Detect each separate exercise/question on the sheet.
+2. Note original question number/label (e.g. "Questão 1", "1", "2.a", "Ex 3").
+3. Assign a 1-based sequential ordinal (1, 2, 3, ...).
+4. Extract the full statement text for each question.
+5. Identify any subitems (e.g. ["a) ...", "b) ..."]).
+6. List figure references (e.g. ["Figura 1", "Gráfico de vazão"]).
+7. List table references (e.g. ["Tabela 1"]).
+8. Note if figures or tables are shared across multiple questions.
+
+Return one JSON object matching this schema:
+{
+  "document_id": string,
+  "detected_questions": integer,
+  "has_shared_figures": boolean,
+  "has_shared_tables": boolean,
+  "questions": [
+    {
+      "source_number": string,
+      "ordinal": integer (starting at 1),
+      "statement": string,
+      "subitems": [string],
+      "figure_references": [string],
+      "table_references": [string]
+    }
+  ]
+}
+"""
+
+
+class _ManifestQuestionPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    source_number: str
+    ordinal: int
+    statement: str
+    subitems: list[str] = []
+    figure_references: list[str] = []
+    table_references: list[str] = []
+
+
+class _DocumentManifestPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    document_id: str
+    detected_questions: int
+    has_shared_figures: bool = False
+    has_shared_tables: bool = False
+    questions: list[_ManifestQuestionPayload] = []
+
+
 class OpenRouterVisionProvider:
     def __init__(
         self,
@@ -204,7 +259,7 @@ class OpenRouterVisionProvider:
             raise OpenRouterBudgetExceeded("Monthly model budget has been reached")
 
         image_data_url = "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("ascii")
-        request_body = {
+        request_body: dict[str, object] = {
             "model": self._model,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -266,6 +321,77 @@ class OpenRouterVisionProvider:
         except (KeyError, IndexError, TypeError, ValueError, ValidationError) as error:
             raise OpenRouterInvalidResponse(
                 "OpenRouter returned invalid interpretation JSON"
+            ) from error
+
+    def interpret_document_manifest(
+        self,
+        image_bytes: bytes,
+        *,
+        document_id: str | None = None,
+    ) -> DocumentManifest:
+        if not image_bytes:
+            raise ValueError("A non-empty JPEG image is required")
+        if len(image_bytes) > MAX_IMAGE_BYTES:
+            raise ValueError("JPEG image exceeds the configured provider limit")
+        if self._usage_recorder is not None and self._usage_recorder.is_over_budget():
+            raise OpenRouterBudgetExceeded("Monthly model budget has been reached")
+
+        doc_id = document_id or f"doc-{int(time.time())}"
+        image_data_url = "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("ascii")
+        request_body: dict[str, object] = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": DOCUMENT_MANIFEST_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"Analyze this exercise sheet (document_id: '{doc_id}') "
+                                "and inventory all questions, subitems, figures, and tables."
+                            ),
+                        },
+                        {"type": "image_url", "image_url": {"url": image_data_url}},
+                    ],
+                },
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        response = self._post_with_retries(request_body)
+        response_body = response.json()
+        try:
+            choice = response_body["choices"][0]
+            raw_content = _strip_json_fence(choice["message"]["content"])
+            payload = _DocumentManifestPayload.model_validate_json(raw_content)
+            questions = tuple(
+                ManifestQuestion(
+                    source_number=q.source_number,
+                    ordinal=q.ordinal,
+                    statement=q.statement,
+                    subitems=tuple(q.subitems),
+                    figure_references=tuple(q.figure_references),
+                    table_references=tuple(q.table_references),
+                )
+                for q in payload.questions
+            )
+            detected_count = (
+                len(questions)
+                if payload.detected_questions == 0
+                else payload.detected_questions
+            )
+            manifest = DocumentManifest(
+                document_id=payload.document_id or doc_id,
+                detected_questions=detected_count,
+                questions=questions,
+                has_shared_figures=payload.has_shared_figures,
+                has_shared_tables=payload.has_shared_tables,
+            )
+            self._record_usage(response_body)
+            return manifest
+        except (KeyError, IndexError, TypeError, ValueError, ValidationError) as error:
+            raise OpenRouterInvalidResponse(
+                "OpenRouter returned invalid document manifest JSON"
             ) from error
 
     def _record_usage(self, response_body: object) -> None:

@@ -65,3 +65,30 @@ def test_formula_assets_are_bounded_and_keys_are_path_safe(tmp_path: Path) -> No
         store.store(b"x" * 17)
     with pytest.raises(ValueError):
         store.path_for("../../outside.svg")
+
+
+@pytest.mark.parametrize(
+    ("latex", "expected_text"),
+    [
+        (r"\frac{\partial T}{\partial x} + \rho", "(∂T)/(∂x) + ρ"),
+        (r"\sum_{i=1}^{n} x_{i}", "∑ᵢ₌₁ⁿ xᵢ"),
+        (r"\boxed{f'(x) = 30x}", "[f'(x) = 30x]"),
+        (r"\vec{v} \cdot \nabla p", "v\u20D7 ·∇p"),
+    ],
+)
+def test_advanced_engineering_symbols_are_rendered_to_svg(
+    tmp_path: Path,
+    latex: str,
+    expected_text: str,
+) -> None:
+    store = PrivateFormulaAssetStore(tmp_path / "formula-assets")
+    rendered = FormulaRenderer(store).render(
+        latex=latex,
+        fallback_text="engineering expression",
+        alt_text="Engineering formula",
+    )
+
+    assert rendered.rendered is True
+    assert rendered.plain_text == expected_text
+    assert rendered.asset_key is not None
+

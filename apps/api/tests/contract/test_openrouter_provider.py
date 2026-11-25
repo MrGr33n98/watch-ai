@@ -222,3 +222,51 @@ def test_openrouter_parses_agent_solution_steps() -> None:
     assert result.solution_steps[1].latex == r"\frac{du}{dx} = 6x"
     assert result.solution_steps[2].kind == "result"
 
+
+def test_openrouter_parses_document_manifest() -> None:
+    output = {
+        "document_id": "exam-2026-01",
+        "detected_questions": 3,
+        "has_shared_figures": True,
+        "has_shared_tables": False,
+        "questions": [
+            {
+                "source_number": "Questão 1",
+                "ordinal": 1,
+                "statement": "Calcule a vazão mássica.",
+                "subitems": ["a) Regime laminar", "b) Regime turbulento"],
+                "figure_references": ["Figura 1 - Esquema da tubulação"],
+                "table_references": [],
+            },
+            {
+                "source_number": "Questão 2",
+                "ordinal": 2,
+                "statement": "Determine a perda de carga.",
+                "subitems": [],
+                "figure_references": ["Figura 1 - Esquema da tubulação"],
+                "table_references": [],
+            },
+            {
+                "source_number": "3",
+                "ordinal": 3,
+                "statement": "Calcule a eficiência da bomba.",
+                "subitems": [],
+                "figure_references": [],
+                "table_references": [],
+            },
+        ],
+    }
+    provider = provider_for(lambda _: make_response(json.dumps(output)))
+    manifest = provider.interpret_document_manifest(b"fake-sheet-jpeg", document_id="exam-2026-01")
+    provider.close()
+
+    assert manifest.document_id == "exam-2026-01"
+    assert manifest.detected_questions == 3
+    assert manifest.has_shared_figures is True
+    assert len(manifest.questions) == 3
+    assert manifest.questions[0].source_number == "Questão 1"
+    assert manifest.questions[0].subitems == ("a) Regime laminar", "b) Regime turbulento")
+    assert manifest.questions[1].figure_references == ("Figura 1 - Esquema da tubulação",)
+    assert manifest.questions[2].ordinal == 3
+
+

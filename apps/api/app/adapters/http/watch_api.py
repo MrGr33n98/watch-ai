@@ -21,8 +21,8 @@ class SessionSummaryResponse(BaseModel):
 
     id: UUID
     status: str
-    received_count: int = Field(ge=0, le=4)
-    expected_count: int = Field(ge=1, le=4)
+    received_count: int = Field(ge=0)
+    expected_count: int = Field(ge=1)
     created_at: datetime
 
 
@@ -30,7 +30,7 @@ class QuestionSummaryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    ordinal: int = Field(ge=1, le=4)
+    ordinal: int = Field(ge=1)
     status: str
     title: str | None = None
     result_preview: str | None = None
@@ -48,7 +48,7 @@ class ApiErrorResponse(BaseModel):
 
 
 class StudySessionResponse(SessionSummaryResponse):
-    questions: list[QuestionSummaryResponse] = Field(max_length=4)
+    questions: list[QuestionSummaryResponse]
 
 
 class SolutionStepResponse(BaseModel):
@@ -149,7 +149,7 @@ def delete_session(
 )
 def get_question(
     session_id: UUID,
-    ordinal: Annotated[int, Path(ge=1, le=4)],
+    ordinal: Annotated[int, Path(ge=1)],
     database: DatabaseSession,
     principal: Annotated[WatchPrincipal, Depends(require_watch_principal)],
 ) -> QuestionDetailResponse:
@@ -171,7 +171,7 @@ def get_question(
 )
 def render_solution_step(
     session_id: UUID,
-    ordinal: Annotated[int, Path(ge=1, le=4)],
+    ordinal: Annotated[int, Path(ge=1)],
     step_ordinal: Annotated[int, Path(ge=1)],
     request: Request,
     database: DatabaseSession,

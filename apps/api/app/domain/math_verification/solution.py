@@ -51,8 +51,8 @@ class SolutionProblem:
     target_unit: str | None = None
 
     def __post_init__(self) -> None:
-        if isinstance(self.ordinal, bool) or not 1 <= self.ordinal <= 4:
-            raise ValueError("Question ordinal must be between 1 and 4")
+        if isinstance(self.ordinal, bool) or self.ordinal < 1:
+            raise ValueError("Question ordinal must be at least 1")
         if not self.statement.strip() or not self.problem_type.strip():
             raise ValueError("Solution problem statement and type must not be empty")
         if self.confidence is InterpretationConfidence.LOW and not self.needs_review:

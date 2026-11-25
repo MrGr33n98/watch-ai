@@ -69,7 +69,7 @@ class WatchApiClient internal constructor(
 
     override suspend fun getQuestion(accessToken: String, sessionId: String, ordinal: Int): QuestionDetail {
         requireUuid(sessionId)
-        require(ordinal in 1..4)
+        require(ordinal >= 1) { "Question ordinal must be positive" }
         val response = request("GET", "/v1/sessions/$sessionId/questions/$ordinal", accessToken)
         return parseSafely(response, ::parseQuestionDetail)
     }

@@ -73,9 +73,9 @@ class QuestionOrder:
         if (
             isinstance(self.value, bool)
             or not isinstance(self.value, int)
-            or not 1 <= self.value <= 4
+            or self.value < 1
         ):
-            raise ValueError("Question order must be between 1 and 4")
+            raise ValueError("Question order must be at least 1")
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,7 +193,7 @@ class StudySession:
 
     def attach_question(self, media_sha: str) -> QuestionItem:
         """Attach a question in arrival order; reaching the target queues the batch."""
-        if len(self._questions) >= self.expected_count or len(self._questions) >= 4:
+        if len(self._questions) >= self.expected_count:
             raise TooManyQuestions("Session already contains its maximum question count")
         if self.status not in {SessionStatus.CREATED, SessionStatus.COLLECTING}:
             raise InvalidSessionTransition("Questions can only be attached while collecting")
@@ -302,9 +302,9 @@ class StudySession:
         if (
             isinstance(expected_count, bool)
             or not isinstance(expected_count, int)
-            or not 1 <= expected_count <= 4
+            or expected_count < 1
         ):
-            raise InvalidExpectedQuestionCount("Expected question count must be between 1 and 4")
+            raise InvalidExpectedQuestionCount("Expected question count must be at least 1")
 
     def _question_index(self, ordinal: int) -> int:
         if isinstance(ordinal, bool) or not 1 <= ordinal <= self.received_count:

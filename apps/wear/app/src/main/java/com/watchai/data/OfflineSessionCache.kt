@@ -46,8 +46,8 @@ class AtomicSessionFileCache(context: Context) : OfflineSessionCache {
     override fun deleteSession(sessionId: String) {
         val normalizedId = normalizeUuid(sessionId)
         AtomicFile(File(root, "session_$normalizedId.json")).delete()
-        (1..4).forEach { ordinal ->
-            AtomicFile(File(root, "question_${normalizedId}_$ordinal.json")).delete()
+        root.listFiles { _, name -> name.startsWith("question_${normalizedId}_") }?.forEach { file ->
+            AtomicFile(file).delete()
         }
         val cachedSessions = readSessionList() ?: return
         runCatching {
@@ -71,7 +71,7 @@ class AtomicSessionFileCache(context: Context) : OfflineSessionCache {
     }
 
     private fun questionFile(sessionId: String, ordinal: Int): File {
-        require(ordinal in 1..4) { "Question ordinal must be between one and four" }
+        require(ordinal >= 1) { "Question ordinal must be positive" }
         val normalizedId = normalizeUuid(sessionId)
         return File(root, "question_${normalizedId}_$ordinal.json")
     }

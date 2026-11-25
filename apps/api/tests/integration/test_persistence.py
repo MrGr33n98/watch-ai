@@ -86,13 +86,20 @@ def test_question_requires_an_existing_session(
             database.flush()
 
 
-@pytest.mark.parametrize("expected_count", [0, 5])
-def test_expected_question_count_is_constrained_to_one_through_four(
+@pytest.mark.parametrize("expected_count", [0, -1])
+def test_expected_question_count_is_constrained_to_positive(
     database_sessions: sessionmaker[Session],
     expected_count: int,
 ) -> None:
     with pytest.raises(IntegrityError):
         create_session(database_sessions, expected_count=expected_count)
+
+
+def test_expected_question_count_supports_more_than_four(
+    database_sessions: sessionmaker[Session],
+) -> None:
+    _, session_id = create_session(database_sessions, expected_count=6)
+    assert session_id is not None
 
 
 @pytest.mark.parametrize("expected_count,received_count", [(4, 5), (1, 2)])
@@ -109,8 +116,8 @@ def test_received_question_count_is_within_supported_and_expected_bounds(
         )
 
 
-@pytest.mark.parametrize("ordinal", [0, 5])
-def test_question_ordinal_is_constrained_to_one_through_four(
+@pytest.mark.parametrize("ordinal", [0, -1])
+def test_question_ordinal_is_constrained_to_positive(
     database_sessions: sessionmaker[Session],
     ordinal: int,
 ) -> None:
@@ -120,6 +127,16 @@ def test_question_ordinal_is_constrained_to_one_through_four(
         with database_sessions.begin() as database:
             database.add(QuestionRecord(session_id=session_id, ordinal=ordinal, status="uploaded"))
             database.flush()
+
+
+def test_question_ordinal_supports_more_than_four(
+    database_sessions: sessionmaker[Session],
+) -> None:
+    _, session_id = create_session(database_sessions, expected_count=8)
+
+    with database_sessions.begin() as database:
+        database.add(QuestionRecord(session_id=session_id, ordinal=5, status="uploaded"))
+        database.flush()
 
 
 def test_study_session_requires_an_existing_user(

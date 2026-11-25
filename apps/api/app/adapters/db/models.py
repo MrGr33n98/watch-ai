@@ -39,8 +39,8 @@ class UserRecord(Base):
 class StudySessionRecord(Base):
     __tablename__ = "study_sessions"
     __table_args__ = (
-        CheckConstraint("expected_count BETWEEN 1 AND 4", name="ck_session_expected_count"),
-        CheckConstraint("received_count BETWEEN 0 AND 4", name="ck_session_received_count"),
+        CheckConstraint("expected_count >= 1", name="ck_session_expected_count"),
+        CheckConstraint("received_count >= 0", name="ck_session_received_count"),
         CheckConstraint("received_count <= expected_count", name="ck_session_received_le_expected"),
         CheckConstraint(
             "status IN ('created', 'collecting', 'queued', 'processing', 'ready', "
@@ -87,7 +87,7 @@ class QuestionRecord(Base):
     __tablename__ = "questions"
     __table_args__ = (
         UniqueConstraint("session_id", "ordinal", name="uq_questions_session_ordinal"),
-        CheckConstraint("ordinal BETWEEN 1 AND 4", name="ck_question_ordinal"),
+        CheckConstraint("ordinal >= 1", name="ck_question_ordinal"),
         CheckConstraint(
             "status IN ('uploaded', 'validating', 'interpreting', 'solving', "
             "'ready', 'needs_review', 'failed')",

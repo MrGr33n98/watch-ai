@@ -32,12 +32,23 @@ def test_sessions_preserve_question_order_and_queue_at_expected_count(
     assert session.status is SessionStatus.QUEUED
 
 
-@pytest.mark.parametrize("expected_count", [0, 5, -1, 1.5, True])
-def test_session_rejects_expected_question_counts_outside_one_to_four(
+@pytest.mark.parametrize("expected_count", [0, -1, 1.5, True])
+def test_session_rejects_non_positive_expected_question_counts(
     expected_count: int,
 ) -> None:
     with pytest.raises(InvalidExpectedQuestionCount):
         StudySession.new(expected_count=expected_count)
+
+
+def test_session_supports_more_than_four_questions() -> None:
+    session = StudySession.new(expected_count=6)
+    questions = [
+        session.attach_question(media_sha=f"sha{index}")
+        for index in range(6)
+    ]
+    assert len(questions) == 6
+    assert [q.ordinal for q in questions] == list(range(1, 7))
+    assert session.status is SessionStatus.QUEUED
 
 
 def test_session_rejects_a_fifth_question_without_replacing_existing_items() -> None:

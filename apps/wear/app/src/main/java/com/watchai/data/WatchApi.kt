@@ -56,7 +56,7 @@ internal fun parseQuestionCard(json: org.json.JSONObject): QuestionCard = Questi
 
 internal fun parseStudySession(json: org.json.JSONObject): StudySession {
     val questionsJson = json.getJSONArray("questions")
-    require(questionsJson.length() <= 4) { "Session contains more than four questions" }
+    require(questionsJson.length() <= 50) { "Session contains too many questions" }
     val questions = (0 until questionsJson.length())
         .map { parseQuestionCard(questionsJson.getJSONObject(it)) }
         .sortedBy { it.ordinal }
