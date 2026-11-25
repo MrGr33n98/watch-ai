@@ -58,7 +58,9 @@ class OfflineSessionCacheTest {
     @Test
     fun `cache validates identifiers ordinals and payload size`() {
         assertThrows(IllegalArgumentException::class.java) { cache.writeSession("../escape", "{}") }
-        assertThrows(IllegalArgumentException::class.java) { cache.writeQuestion(sessionId, 5, "{}") }
+        assertThrows(IllegalArgumentException::class.java) { cache.writeQuestion(sessionId, 0, "{}") }
+        cache.writeQuestion(sessionId, 5, "{}")
+        assertEquals("{}", cache.readQuestion(sessionId, 5))
         assertThrows(IllegalArgumentException::class.java) {
             cache.writeSession(sessionId, "x".repeat(2 * 1024 * 1024 + 1))
         }
