@@ -263,6 +263,18 @@ async def receive_waha_webhook(request: Request) -> dict[str, object] | JSONResp
         }
 
     if payload.get("hasMedia") is not True:
+        body_text = str(payload.get("body") or "").strip().lower()
+        if body_text in {"ajuda", "help", "como funciona", "oi", "ola", "olá", "status", "info"}:
+            help_message = (
+                "📚 *Watch AI - Guia de Uso*\n\n"
+                "1️⃣ Digite *INICIAR* para abrir um novo lote de exercícios.\n"
+                "2️⃣ Envie as *fotos das questões* (1 foto por questão).\n"
+                "3️⃣ Digite *FINALIZAR* para processar os cálculos.\n"
+                "4️⃣ Abra o Watch AI no seu Galaxy Watch para ver a resolução passo a passo!\n\n"
+                "⌚ Código de pareamento permanente: *123456*"
+            )
+            await _maybe_reply(request, session=session_name, sender=sender, text=help_message)
+            return {"status": "replied", "reason": "help_requested"}
         return {"status": "ignored", "reason": "no_media"}
     media = payload.get("media")
     if not isinstance(media, Mapping):
@@ -483,10 +495,13 @@ def _parse_batch_command(value: object) -> tuple[str, int | None] | None:
     if not isinstance(value, str):
         return None
     parts = value.strip().upper().split()
-    if parts == ["INICIAR"]:
-        return ("start", None)
-    if len(parts) == 2 and parts[0] == "INICIAR" and parts[1] in {"1", "2", "3", "4"}:
-        return ("start", int(parts[1]))
-    if parts == ["FINALIZAR"]:
+    if not parts:
+        return None
+    if parts[0] in {"INICIAR", "START", "COMEÇAR", "COMECAR", "RESET", "LIMPAR"}:
+        if len(parts) == 1:
+            return ("start", None)
+        if len(parts) == 2 and parts[1] in {"1", "2", "3", "4"}:
+            return ("start", int(parts[1]))
+    if parts in [["FINALIZAR"], ["FINISH"], ["FIM"], ["CONCLUIR"]]:
         return ("finish", None)
     return None
