@@ -123,11 +123,7 @@ class SqlAlchemySessionQueryRepository:
     @staticmethod
     def _to_question_summary(question: QuestionRecord) -> QuestionSummaryRead:
         preview = None
-        if (
-            question.status == "ready"
-            and question.verification_status == "verified"
-            and question.final_answer is not None
-        ):
+        if question.status == "ready" and question.final_answer is not None:
             preview = " ".join(part for part in (question.final_answer, question.units) if part)
         return QuestionSummaryRead(
             id=question.id,
