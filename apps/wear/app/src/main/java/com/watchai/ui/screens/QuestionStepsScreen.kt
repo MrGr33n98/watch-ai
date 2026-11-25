@@ -1,0 +1,212 @@
+package com.watchai.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.ListHeaderDefaults
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.SurfaceTransformation
+import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.lazy.TransformationSpec
+import androidx.wear.compose.material3.lazy.transformedHeight
+import com.watchai.domain.QuestionDetail
+import com.watchai.domain.QuestionPresentation
+
+@Composable
+fun QuestionStepsScreen(
+    detail: QuestionDetail,
+    stepIndex: Int,
+    offline: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val presentation = QuestionPresentation(detail.card, detail.verified, detail.finalAnswer)
+    val verifiedAnswer = detail.finalAnswer.takeIf { presentation.canShowVerifiedAnswer }
+    val safeIndex = stepIndex.coerceIn(0, (detail.steps.size - 1).coerceAtLeast(0))
+    val currentStep = detail.steps.getOrNull(safeIndex)
+    WearScreenScaffold { transformationSpec ->
+        item(key = "question-header", contentType = "header") {
+            ListHeader(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .transformedHeight(this, transformationSpec)
+                    .minimumVerticalContentPadding(ListHeaderDefaults.minimumTopListContentPadding),
+                transformation = SurfaceTransformation(transformationSpec),
+            ) {
+                Text(detail.card.label, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+        detail.card.title?.let { title ->
+            item(key = "question-title", contentType = "text") {
+                WearTextItem(title, transformationSpec, this)
+            }
+        }
+        if (offline) {
+            item(key = "offline", contentType = "status") {
+                WearTextItem("Offline · conteúdo salvo", transformationSpec, this, MaterialTheme.colorScheme.primary)
+            }
+        }
+        if (presentation.requiresReview) {
+            item(key = "review", contentType = "warning") {
+                WearTextItem(
+                    "Precisa de revisão",
+                    transformationSpec,
+                    this,
+                    MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            item(key = "unverified", contentType = "status") {
+                WearTextItem("Resultado não verificado", transformationSpec, this, MaterialTheme.colorScheme.error)
+            }
+        }
+        if (safeIndex == 0) {
+            item(key = "statement-heading", contentType = "heading") {
+                WearTextItem("Problema", transformationSpec, this, style = MaterialTheme.typography.titleSmall)
+            }
+            item(key = "statement", contentType = "statement") {
+                WearTextItem(
+                    detail.statement,
+                    transformationSpec,
+                    this,
+                    style = MaterialTheme.typography.bodyLarge,
+                    accessibilityText = "Enunciado do problema: ${detail.statement}",
+                )
+            }
+        }
+
+        if (currentStep != null) {
+            item(key = "step-count", contentType = "status") {
+                WearTextItem(
+                    "Passo ${safeIndex + 1} de ${detail.steps.size}",
+                    transformationSpec,
+                    this,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+            item(key = "step-title", contentType = "heading") {
+                WearTextItem(currentStep.title, transformationSpec, this, style = MaterialTheme.typography.titleSmall)
+            }
+            item(key = "step-content", contentType = "math") {
+                Box(
+                    modifier = wearListItemModifier(transformationSpec)
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            shape = MaterialTheme.shapes.large,
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                            shape = MaterialTheme.shapes.large,
+                        )
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = currentStep.plainText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics { contentDescription = currentStep.altText ?: currentStep.plainText },
+                    )
+                }
+            }
+            item(key = "step-verification", contentType = "status") {
+                val stepStatus = if (currentStep.verified) "Etapa verificada" else "Etapa não verificada"
+                WearTextItem(
+                    stepStatus,
+                    transformationSpec,
+                    this,
+                    color = if (currentStep.verified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                )
+            }
+        } else {
+            item(key = "steps-empty", contentType = "warning") {
+                WearTextItem("Etapas indisponíveis", transformationSpec, this, MaterialTheme.colorScheme.error)
+            }
+        }
+
+        verifiedAnswer?.let { answer ->
+            item(key = "result-heading", contentType = "heading") {
+                val resultLabel = if (detail.verified) "Resultado verificado" else "Resultado não verificado"
+                WearTextItem(
+                    resultLabel,
+                    transformationSpec,
+                    this,
+                    color = if (detail.verified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            item(key = "result", contentType = "result") {
+                WearTextItem(
+                    if (detail.units.isNullOrBlank()) answer else "$answer ${detail.units}",
+                    transformationSpec,
+                    this,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
+        }
+
+        item(key = "step-navigation", contentType = "action") {
+            Row(
+                modifier = wearListItemModifier(transformationSpec),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = onPrevious,
+                    enabled = safeIndex > 0,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = "Passo anterior" },
+                    transformation = SurfaceTransformation(transformationSpec),
+                    label = {
+                        Text(
+                            "◀ Ant",
+                            maxLines = 1,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                )
+                Button(
+                    onClick = onNext,
+                    enabled = safeIndex < detail.steps.lastIndex,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = "Próximo passo" },
+                    transformation = SurfaceTransformation(transformationSpec),
+                    label = {
+                        Text(
+                            "Próx ▶",
+                            maxLines = 1,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                )
+            }
+        }
+        item(key = "back", contentType = "action") {
+            WearActionButton("Questões", "Voltar para questões", transformationSpec, this, onBack)
+        }
+    }
+}

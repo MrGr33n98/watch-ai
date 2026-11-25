@@ -1,0 +1,234 @@
+package com.watchai.ui
+
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.watchai.domain.QuestionCard
+import com.watchai.domain.QuestionDetail
+import com.watchai.domain.QuestionStatus
+import com.watchai.domain.SolutionStep
+import com.watchai.ui.screens.QuestionStepsScreen
+import com.watchai.ui.screens.WatchAiWearRoot
+import android.graphics.Bitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+
+class QuestionStepsScreenTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun `navigates forward and backward through named solution steps`() {
+        var currentIndex by mutableIntStateOf(0)
+        val detail = QuestionDetail(
+            card = QuestionCard("q1", 1, QuestionStatus.READY),
+            statement = "Calcule 2 + 2.",
+            verified = true,
+            verificationStatus = "verified",
+            finalAnswer = "4",
+            units = null,
+            steps = listOf(
+                SolutionStep(1, "statement", "Enunciado", "Calcule 2 + 2.", verified = true),
+                SolutionStep(2, "formula", "Fórmula", "2 + 2 = 4", verified = true),
+            ),
+        )
+
+        composeRule.setContent {
+            WatchAiWearRoot {
+                QuestionStepsScreen(
+                    detail = detail,
+                    stepIndex = currentIndex,
+                    offline = false,
+                    onPrevious = { currentIndex -= 1 },
+                    onNext = { currentIndex += 1 },
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.scrollToDisplayed(hasText("Enunciado"))
+        composeRule.scrollToDisplayed(hasText("Passo 1 de 2"))
+        composeRule.scrollToDisplayed(hasContentDescription("Próximo passo")).performClick()
+        composeRule.scrollToDisplayed(hasText("Passo 2 de 2"))
+        composeRule.scrollToDisplayed(hasText("Fórmula"))
+        composeRule.scrollToDisplayed(hasContentDescription("Passo anterior")).performClick()
+        composeRule.scrollToDisplayed(hasText("Enunciado"))
+    }
+
+    @Test
+    fun `review response never labels its answer as verified`() {
+        val review = QuestionDetail(
+            card = QuestionCard("q2", 2, QuestionStatus.NEEDS_REVIEW),
+            statement = "Símbolo ilegível.",
+            verified = false,
+            verificationStatus = "inconclusive",
+            finalAnswer = null,
+            units = null,
+            steps = emptyList(),
+        )
+
+        composeRule.setContent {
+            WatchAiWearRoot {
+                QuestionStepsScreen(review, 0, offline = false, onPrevious = {}, onNext = {}, onBack = {})
+            }
+        }
+
+        composeRule.scrollToDisplayed(hasText("Precisa de revisão"))
+        composeRule.scrollToDisplayed(hasText("Resultado não verificado"))
+    }
+
+    @Test
+    fun `review status suppresses a contradictory final answer`() {
+        val inconsistent = QuestionDetail(
+            card = QuestionCard("q2", 2, QuestionStatus.NEEDS_REVIEW),
+            statement = "A imagem está ambígua.",
+            verified = true,
+            verificationStatus = "verified",
+            finalAnswer = "42",
+            units = null,
+            steps = emptyList(),
+        )
+
+        composeRule.setContent {
+            WatchAiWearRoot {
+                QuestionStepsScreen(inconsistent, 0, offline = false, onPrevious = {}, onNext = {}, onBack = {})
+            }
+        }
+
+        composeRule.scrollToDisplayed(hasText("Precisa de revisão"))
+        composeRule.onNodeWithText("42").assertDoesNotExist()
+    }
+
+    @Test
+    fun `solution statements and navigation expose accessible labels and state`() {
+        val detail = sampleQuestion()
+        composeRule.setContent {
+            WatchAiWearRoot {
+                QuestionStepsScreen(detail, 0, offline = false, onPrevious = {}, onNext = {}, onBack = {})
+            }
+        }
+
+        composeRule.scrollToDisplayed(hasContentDescription("Calcule 2 + 2."))
+        composeRule.scrollToDisplayed(hasContentDescription("Passo anterior")).assertIsNotEnabled()
+        composeRule.scrollToDisplayed(hasContentDescription("Próximo passo")).assertIsEnabled()
+    }
+
+    @Test
+    fun `cached solution announces offline status`() {
+        composeRule.setContent {
+            WatchAiWearRoot {
+                QuestionStepsScreen(sampleQuestion(), 0, offline = true, onPrevious = {}, onNext = {}, onBack = {})
+            }
+        }
+
+        composeRule.scrollToDisplayed(hasText("Offline · conteúdo salvo"))
+    }
+
+    @Test
+    fun `captures synthetic solution screenshot for CI review`() {
+        composeRule.setContent {
+            WatchAiWearRoot {
+                QuestionStepsScreen(sampleQuestion(), 0, offline = false, onPrevious = {}, onNext = {}, onBack = {})
+            }
+        }
+        composeRule.waitForIdle()
+
+        val screenshot = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        val output = InstrumentationRegistry.getInstrumentation().targetContext.filesDir
+        val file = File(output, "watch-ai-question-detail.png")
+        file.outputStream().use { stream ->
+            assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream))
+        }
+        assertTrue("Screenshot was not written", file.isFile && file.length() > 0)
+    }
+
+    @Test
+    fun `question steps fit representative 40mm round display at 1_3 text scale`() {
+        assertRoundDisplayFits(180.dp, 1.3f)
+    }
+
+    @Test
+    fun `question steps fit representative 40mm round display at 1_5 text scale`() {
+        assertRoundDisplayFits(180.dp, 1.5f)
+    }
+
+    @Test
+    fun `question steps fit representative 44mm round display at 1_3 text scale`() {
+        assertRoundDisplayFits(200.dp, 1.3f)
+    }
+
+    @Test
+    fun `question steps fit representative 44mm round display at 1_5 text scale`() {
+        assertRoundDisplayFits(200.dp, 1.5f)
+    }
+
+    private fun assertRoundDisplayFits(displayDiameter: Dp, fontScale: Float) {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = fontScale)) {
+                Box(
+                    modifier = Modifier
+                        .requiredSize(displayDiameter)
+                        .clip(CircleShape)
+                        .testTag("round-display"),
+                ) {
+                    WatchAiWearRoot {
+                        QuestionStepsScreen(
+                            sampleQuestion(),
+                            stepIndex = 0,
+                            offline = false,
+                            onPrevious = {},
+                            onNext = {},
+                            onBack = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.scrollToDisplayed(hasContentDescription("Problema"))
+        val control = composeRule.scrollToDisplayed(hasContentDescription("Próximo passo"))
+        val displayBounds = composeRule.onNodeWithTag("round-display").fetchSemanticsNode().boundsInRoot
+        val controlBounds = control.fetchSemanticsNode().boundsInRoot
+        assertTrue("Navigation control clipped at $displayDiameter/$fontScale", controlBounds.left >= displayBounds.left)
+        assertTrue("Navigation control clipped at $displayDiameter/$fontScale", controlBounds.right <= displayBounds.right)
+    }
+
+    private fun sampleQuestion() = QuestionDetail(
+        card = QuestionCard("q-layout", 1, QuestionStatus.READY),
+        statement = "Calcule 2 + 2.",
+        verified = true,
+        verificationStatus = "verified",
+        finalAnswer = "4",
+        units = null,
+        steps = listOf(
+            SolutionStep(1, "statement", "Enunciado", "Calcule 2 + 2.", verified = true),
+            SolutionStep(2, "formula", "Fórmula", "2 + 2 = 4", verified = true),
+        ),
+    )
+}

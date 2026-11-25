@@ -1,0 +1,286 @@
+openapi: 3.1.0
+info:
+  title: Watch AI REST API
+  version: 0.1.0
+  description: Contrato proposto para MVP; ainda não implementado.
+servers:
+  - url: https://watch-ai.example.test
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: API viva
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, const: ok}
+  /v1/device-pairings:
+    post:
+      operationId: pairWatch
+      security: []
+      description: Troca código temporário provisionado por um operador autorizado; aplicar rate limit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pairing_code, device_name]
+              properties:
+                pairing_code: {type: string, minLength: 6, maxLength: 12}
+                device_name: {type: string, maxLength: 120}
+      responses:
+        '201':
+          description: Pareado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingResponse'
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /v1/devices/me:
+    delete:
+      operationId: revokeWatchDevice
+      description: Revoga o token do dispositivo autenticado imediatamente.
+      responses:
+        '204': {description: Token revogado}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /v1/sessions:
+    get:
+      operationId: listSessions
+      parameters:
+        - in: query
+          name: limit
+          schema: {type: integer, minimum: 1, maximum: 20, default: 10}
+      responses:
+        '200':
+          description: Sessões do dispositivo autorizado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/SessionSummary'}
+                  next_cursor: {type: [string, 'null']}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /v1/sessions/{session_id}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      operationId: getSession
+      responses:
+        '200':
+          description: Sessão com perguntas e status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StudySession'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      operationId: deleteSession
+      responses:
+        '204': {description: Sessão, soluções e mídias privadas excluídas}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/sessions/{session_id}/questions/{ordinal}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - name: ordinal
+        in: path
+        required: true
+        schema: {type: integer, minimum: 1, maximum: 4}
+    get:
+      operationId: getQuestion
+      responses:
+        '200':
+          description: Questão com todos os passos
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QuestionDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/sessions/{session_id}/questions/{ordinal}/steps/{step_ordinal}/render:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - name: ordinal
+        in: path
+        required: true
+        schema: {type: integer, minimum: 1, maximum: 4}
+      - name: step_ordinal
+        in: path
+        required: true
+        schema: {type: integer, minimum: 1}
+    get:
+      operationId: renderSolutionStep
+      responses:
+        '200':
+          description: SVG privado da fórmula matemática da etapa
+          content:
+            image/svg+xml: {}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /internal/waha/events:
+    post:
+      operationId: receiveWahaMessage
+      security:
+        - webhookAuth: []
+      description: Endpoint interno atrás de gateway; corpo do WAHA varia por versão/engine; converter para ACL normalizada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        '202': {description: Recebido/duplicado e persistido de modo idempotente}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '413': {$ref: '#/components/responses/UploadTooLarge'}
+  /dev/ingest:
+    post:
+      operationId: ingestDevJpeg
+      description: SOMENTE development/test; bloquear completamente em outros ambientes.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+                session_id: {type: string, format: uuid}
+      responses:
+        '202': {description: Aceito}
+        '404': {description: Desabilitado fora de desenvolvimento}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+    webhookAuth:
+      type: apiKey
+      in: header
+      name: X-Webhook-Token
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+  responses:
+    Unauthorized:
+      description: Sem credenciais
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    NotFound:
+      description: Não encontrado ou não autorizado
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    RateLimited:
+      description: Limite excedido
+    UploadTooLarge:
+      description: Arquivo rejeitado por tamanho
+  schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        correlation_id: {type: [string, 'null']}
+    PairingResponse:
+      type: object
+      required: [device_id, access_token, token_type, scope, expires_at]
+      properties:
+        device_id: {type: string, format: uuid}
+        access_token: {type: string, minLength: 32}
+        token_type: {type: string, const: Bearer}
+        scope: {type: string, const: sessions:read}
+        expires_at: {type: string, format: date-time}
+        correlation_id: {type: [string, 'null']}
+    PairingResponse:
+      type: object
+      required: [device_id, access_token, expires_in_seconds]
+      properties:
+        device_id: {type: string, format: uuid}
+        access_token: {type: string}
+        expires_in_seconds: {type: integer, minimum: 1}
+        refresh_token: {type: [string, 'null']}
+    SessionSummary:
+      type: object
+      required: [id, status, received_count, expected_count, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        received_count: {type: integer, minimum: 0, maximum: 4}
+        expected_count: {type: integer, minimum: 1, maximum: 4}
+        created_at: {type: string, format: date-time}
+    SessionStatus:
+      type: string
+      enum: [created, collecting, queued, processing, ready, partial, needs_review, failed, cancelled, expired]
+    QuestionStatus:
+      type: string
+      enum: [uploaded, validating, interpreting, solving, ready, needs_review, failed]
+    StudySession:
+      allOf:
+        - $ref: '#/components/schemas/SessionSummary'
+        - type: object
+          required: [questions]
+          properties:
+            questions:
+              type: array
+              maxItems: 4
+              items: {$ref: '#/components/schemas/QuestionSummary'}
+    QuestionSummary:
+      type: object
+      required: [id, ordinal, status]
+      properties:
+        id: {type: string, format: uuid}
+        ordinal: {type: integer, minimum: 1, maximum: 4}
+        status: {$ref: '#/components/schemas/QuestionStatus'}
+        title: {type: [string, 'null']}
+        result_preview: {type: [string, 'null']}
+    QuestionDetail:
+      allOf:
+        - $ref: '#/components/schemas/QuestionSummary'
+        - type: object
+          required: [statement, verified, steps]
+          properties:
+            statement: {type: string}
+            verified: {type: boolean}
+            verification_status:
+              type: string
+              enum: [verified, unverified, inconclusive, rejected]
+            final_answer: {type: [string, 'null']}
+            units: {type: [string, 'null']}
+            steps:
+              type: array
+              items: {$ref: '#/components/schemas/SolutionStep'}
+    SolutionStep:
+      type: object
+      required: [ordinal, kind, title, plain_text, verified]
+      properties:
+        ordinal: {type: integer, minimum: 1}
+        kind:
+          type: string
+          enum: [statement, identify, formula, substitution, calculation, verification, conclusion]
+        title: {type: string}
+        plain_text: {type: string}
+        latex: {type: [string, 'null']}
+        render_url: {type: [string, 'null'], format: uri}
+        alt_text: {type: [string, 'null']}
+        verified: {type: boolean}

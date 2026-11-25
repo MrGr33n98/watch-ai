@@ -1,0 +1,3 @@
+# Prompt 05 — Auditoria final QA + Security (READ-ONLY)
+
+Audite a PR e todos os módulos `apps/api`, `apps/wear`, `.github/workflows`, contratos e docs. Executar onde disponível: pytest, Ruff, mypy, OpenAPI schema validator, Gradle lint/unit/androidTest/assembleDebug, QA E2E fixture, tests SSRF/replay/429/invalid-JPEG, APK string/secret scan, permission scan, screenshots 40/44mm. Reportar resultados honestos com PASS/FAIL/SKIPPED/BLOCKED, comando, log resumido e prova. Checar uso da IA com JPGs legíveis e ambíguos, rejeição `needs_review`, SymPy/Pint, isolamento do WAHA, privacy/retention. Gerar lista de severidade P0/P1/P2 e no-go se houver falha crítica. Não corrigir nesta etapa (read-only), não fazer deploy nem merge.

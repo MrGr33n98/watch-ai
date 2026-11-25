@@ -1,0 +1,35 @@
+[
+  {
+    "id": "GOLD-FOURIER-001",
+    "topic": "conducao_termica",
+    "statement": "Parede: k=1,2 W/(m K), A=10 m^2, L=0,20 m, deltaT=40 K. Calcule Qdot.",
+    "formula": "k*A*dT/L",
+    "inputs": {"k": "1.2", "A": "10", "dT": "40", "L": "0.20"},
+    "expected": "2400",
+    "expected_unit": "W"
+  },
+  {
+    "id": "GOLD-DERIV-002",
+    "topic": "derivada",
+    "statement": "Derive f(x) = x^2 + 3x.",
+    "formula": "diff(x**2+3*x, x)",
+    "expected": "2*x + 3",
+    "expected_unit": null
+  },
+  {
+    "id": "GOLD-INTEGRAL-003",
+    "topic": "integral_definida",
+    "statement": "Calcule integral de 0 ate 3 de 2x dx.",
+    "formula": "integrate(2*x, (x,0,3))",
+    "expected": "9",
+    "expected_unit": null
+  },
+  {
+    "id": "GOLD-UNIT-004",
+    "topic": "conversao_potencia",
+    "statement": "Converta 1500 W para kW.",
+    "formula": "1500*W -> kW",
+    "expected": "1.5",
+    "expected_unit": "kW"
+  }
+]

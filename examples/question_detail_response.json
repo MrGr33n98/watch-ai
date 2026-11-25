@@ -1,0 +1,18 @@
+{
+  "id": "22222222-2222-4222-8222-222222222221",
+  "ordinal": 1,
+  "status": "ready",
+  "title": "Transferência de calor",
+  "result_preview": "2400 W",
+  "statement": "Parede: k=1,2 W/(m K), A=10 m², L=0,20 m e ΔT=40 K. Calcular taxa de calor.",
+  "verified": true,
+  "verification_status": "verified",
+  "final_answer": "2400",
+  "units": "W",
+  "steps": [
+    {"ordinal": 1, "kind": "identify", "title": "Identificar dados", "plain_text": "k=1,2; A=10; L=0,20; ΔT=40", "latex": null, "render_url": null, "alt_text": "Constantes e geometria da parede", "verified": true},
+    {"ordinal": 2, "kind": "formula", "title": "Lei de Fourier", "plain_text": "Qdot = k × A × ΔT / L", "latex": "\\dot{Q}=kA\\frac{\\Delta T}{L}", "render_url": null, "alt_text": "Taxa de calor igual à condutividade vezes área vezes diferença de temperatura, dividida pela espessura", "verified": true},
+    {"ordinal": 3, "kind": "substitution", "title": "Substituir valores", "plain_text": "Qdot = 1,2 × 10 × 40 / 0,20", "latex": "\\dot{Q}=\\frac{1.2\\times10\\times40}{0.20}", "render_url": null, "alt_text": "Um vírgula dois vezes dez vezes quarenta dividido por zero vírgula vinte", "verified": true},
+    {"ordinal": 4, "kind": "calculation", "title": "Calcular", "plain_text": "Qdot = 2400 W", "latex": "\\dot{Q}=2400\\ \\mathrm{W}", "render_url": null, "alt_text": "Taxa de calor igual a dois mil e quatrocentos watts", "verified": true}
+  ]
+}

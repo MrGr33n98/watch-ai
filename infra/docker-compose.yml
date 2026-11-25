@@ -1,0 +1,120 @@
+services:
+  db:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in infra/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in infra/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in infra/.env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in infra/.env}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      MONTHLY_MODEL_BUDGET_USD: ${MONTHLY_MODEL_BUDGET_USD:-}
+      VISION_PROVIDER: ${VISION_PROVIDER:-auto}
+      ENABLE_EMBEDDED_WORKER: ${ENABLE_EMBEDDED_WORKER:-false}
+      ENABLE_WAHA_INGEST: ${ENABLE_WAHA_INGEST:-false}
+      WAHA_SEND_REPLIES: ${WAHA_SEND_REPLIES:-false}
+      WAHA_BASE_URL: ${WAHA_BASE_URL:-}
+      WAHA_API_KEY: ${WAHA_API_KEY:-}
+      WAHA_WEBHOOK_HMAC_SECRET: ${WAHA_WEBHOOK_HMAC_SECRET:-}
+      WAHA_SENDER_HASH_SECRET: ${WAHA_SENDER_HASH_SECRET:-}
+      WAHA_ALLOWED_SESSIONS: ${WAHA_ALLOWED_SESSIONS:-}
+      WAHA_ALLOWED_SENDERS: ${WAHA_ALLOWED_SENDERS:-}
+      WAHA_SENDER_USER_IDS: ${WAHA_SENDER_USER_IDS:-}
+      WAHA_DEFAULT_QUESTION_COUNT: ${WAHA_DEFAULT_QUESTION_COUNT:-4}
+      WAHA_BATCH_EXPIRY_SECONDS: ${WAHA_BATCH_EXPIRY_SECONDS:-3600}
+      WATCH_AI_MEDIA_DIR: /app/private-media
+      WATCH_AI_RENDER_DIR: /app/private-renders
+      MEDIA_RETENTION_HOURS: ${MEDIA_RETENTION_HOURS:-24}
+      SESSION_RETENTION_DAYS: ${SESSION_RETENTION_DAYS:-30}
+    volumes:
+      - watch_ai_private_media:/app/private-media
+      - watch_ai_private_renders:/app/private-renders
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.worker"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in infra/.env}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      MONTHLY_MODEL_BUDGET_USD: ${MONTHLY_MODEL_BUDGET_USD:-}
+      VISION_PROVIDER: ${VISION_PROVIDER:-auto}
+      OUTBOX_POLL_INTERVAL_SECONDS: ${OUTBOX_POLL_INTERVAL_SECONDS:-1.0}
+      WATCH_AI_MEDIA_DIR: /app/private-media
+      WATCH_AI_RENDER_DIR: /app/private-renders
+    volumes:
+      - watch_ai_private_media:/app/private-media
+      - watch_ai_private_renders:/app/private-renders
+    depends_on:
+      db:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8-alpine
+    profiles: ["tls"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      WATCH_AI_DOMAIN: ${WATCH_AI_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  watch_ai_private_media:
+  watch_ai_private_renders:
+  caddy_data:
+  caddy_config:
