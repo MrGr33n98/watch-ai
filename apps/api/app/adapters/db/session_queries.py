@@ -92,16 +92,7 @@ class SqlAlchemySessionQueryRepository:
             and any(step.kind == "verification" and step.verified for step in all_steps)
             and any(step.kind == "result" and step.verified for step in all_steps)
         )
-        steps = (
-            all_steps
-            if verified
-            else tuple(
-                step
-                for step in all_steps
-                if step.kind in {"statement", "identify", "formula", "substitution", "verification"}
-                and not step.verified
-            )
-        )
+        steps = all_steps
         verification_status = question.verification_status
         if verification_status == "verified" and not verified:
             verification_status = "unverified"
@@ -114,8 +105,8 @@ class SqlAlchemySessionQueryRepository:
             statement=question.statement_text or "",
             verified=verified,
             verification_status=verification_status,
-            final_answer=question.final_answer if verified else None,
-            units=question.units if verified else None,
+            final_answer=question.final_answer,
+            units=question.units,
             steps=steps,
         )
 

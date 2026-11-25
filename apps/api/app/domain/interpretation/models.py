@@ -19,6 +19,16 @@ class ExtractedQuantity:
 
 
 @dataclass(frozen=True, slots=True)
+class InterpretedStep:
+    ordinal: int
+    kind: str
+    title: str
+    plain_text: str
+    latex: str | None = None
+    alt_text: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class InterpretedExercise:
     statement: str | None
     problem_type: str | None
@@ -32,6 +42,10 @@ class InterpretedExercise:
     rhs: str | None = None
     target_unit: str | None = None
     parameters: Mapping[str, ExtractedQuantity] = field(default_factory=dict)
+    solution_steps: tuple[InterpretedStep, ...] = ()
+    final_answer: str | None = None
+    units: str | None = None
+    review_reason: str | None = None
 
     def __post_init__(self) -> None:
         if self.statement is not None and not self.statement.strip():
@@ -47,3 +61,4 @@ class InterpretedExercise:
         if (self.statement is None or self.problem_type is None) and not self.needs_review:
             raise ValueError("Incomplete interpretation must be marked for review")
         object.__setattr__(self, "parameters", MappingProxyType(dict(self.parameters)))
+        object.__setattr__(self, "solution_steps", tuple(self.solution_steps))

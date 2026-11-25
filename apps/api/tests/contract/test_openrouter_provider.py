@@ -178,3 +178,47 @@ def test_openrouter_parses_markdown_fenced_json_object() -> None:
     assert result.statement == "2+2"
     assert result.operation == "simplify"
     assert result.expression == "2 + 2"
+
+
+def test_openrouter_parses_agent_solution_steps() -> None:
+    output = {
+        "statement": "Derive f(x) = (3x^2 + 2)^5",
+        "problem_type": "calculus",
+        "confidence": "high",
+        "needs_review": False,
+        "final_answer": "30x(3x^2 + 2)^4",
+        "units": None,
+        "steps": [
+            {
+                "ordinal": 1,
+                "kind": "identify",
+                "title": "Regra da Cadeia",
+                "plain_text": "Definir u = 3x^2 + 2 e f(u) = u^5",
+                "latex": r"u = 3x^2 + 2,\quad f(u) = u^5",
+            },
+            {
+                "ordinal": 2,
+                "kind": "calculation",
+                "title": "Derivada Interna",
+                "plain_text": "du/dx = 6x",
+                "latex": r"\frac{du}{dx} = 6x",
+            },
+            {
+                "ordinal": 3,
+                "kind": "result",
+                "title": "Resultado",
+                "plain_text": "f'(x) = 30x(3x^2 + 2)^4",
+                "latex": r"f'(x) = 30x(3x^2 + 2)^4",
+            },
+        ],
+    }
+    provider = provider_for(lambda _: make_response(json.dumps(output)))
+    result = provider.interpret(make_message(), image_bytes=b"private-jpeg")
+    provider.close()
+
+    assert result.final_answer == "30x(3x^2 + 2)^4"
+    assert len(result.solution_steps) == 3
+    assert result.solution_steps[0].title == "Regra da Cadeia"
+    assert result.solution_steps[1].latex == r"\frac{du}{dx} = 6x"
+    assert result.solution_steps[2].kind == "result"
+

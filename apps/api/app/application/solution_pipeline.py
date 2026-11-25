@@ -58,17 +58,70 @@ class SolutionPipeline:
             or exercise.problem_type is None
             or exercise.confidence.value != "high"
         ):
-            result = self._review(message.question_ordinal, exercise.statement)
+            if exercise.solution_steps:
+                result = self._from_agent(message.question_ordinal, exercise)
+            else:
+                result = self._review(message.question_ordinal, exercise.statement)
         else:
+            verified_solution: SolvedExercise | None = None
             try:
                 problem = self._problem_mapper.to_problem(exercise, message.question_ordinal)
-                result = self._solution_policy.solve(problem)
+                verified_solution = self._solution_policy.solve(problem)
             except (TypeError, ValueError):
+                verified_solution = None
+
+            if verified_solution is not None and verified_solution.status is SolutionStatus.READY:
+                result = verified_solution
+            elif exercise.solution_steps:
+                result = self._from_agent(message.question_ordinal, exercise)
+            elif verified_solution is not None:
+                result = verified_solution
+            else:
                 result = self._review(message.question_ordinal, exercise.statement)
 
         result = self._render_steps(message, result)
         self._result_repository.save_solution(message, exercise, result)
         return result
+
+    @staticmethod
+    def _from_agent(ordinal: int, exercise: InterpretedExercise) -> SolvedExercise:
+        kind_map = {
+            "statement": SolutionStepKind.STATEMENT,
+            "identify": SolutionStepKind.IDENTIFY,
+            "formula": SolutionStepKind.FORMULA,
+            "substitution": SolutionStepKind.SUBSTITUTION,
+            "calculation": SolutionStepKind.CALCULATION,
+            "verification": SolutionStepKind.VERIFICATION,
+            "result": SolutionStepKind.RESULT,
+        }
+        steps = tuple(
+            SolutionStep(
+                ordinal=s.ordinal,
+                kind=kind_map.get(s.kind.lower(), SolutionStepKind.CALCULATION),
+                title=s.title,
+                plain_text=s.plain_text,
+                verified=False,
+                latex=s.latex,
+                alt_text=s.alt_text,
+            )
+            for s in exercise.solution_steps
+        )
+        status = (
+            SolutionStatus.READY
+            if not exercise.needs_review
+            else SolutionStatus.NEEDS_REVIEW
+        )
+        verification_status = "unverified" if not exercise.needs_review else "inconclusive"
+        return SolvedExercise(
+            ordinal=ordinal,
+            status=status,
+            verification_status=verification_status,
+            verified=False,
+            final_answer=exercise.final_answer,
+            units=exercise.units,
+            steps=steps,
+            review_reason=exercise.review_reason,
+        )
 
     def _render_steps(self, message: InboundMessage, result: SolvedExercise) -> SolvedExercise:
         if (

@@ -120,7 +120,7 @@ paths:
       - name: step_ordinal
         in: path
         required: true
-        schema: {type: integer, minimum: 1, maximum: 20}
+        schema: {type: integer, minimum: 1}
     get:
       operationId: renderSolutionStep
       responses:

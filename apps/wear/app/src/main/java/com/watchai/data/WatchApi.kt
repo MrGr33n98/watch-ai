@@ -120,4 +120,4 @@ internal fun org.json.JSONObject.requiredBoolean(name: String): Boolean {
     return value
 }
 
-private const val MAX_STEPS = 20
+private const val MAX_STEPS = 200

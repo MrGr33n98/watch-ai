@@ -172,7 +172,7 @@ def get_question(
 def render_solution_step(
     session_id: UUID,
     ordinal: Annotated[int, Path(ge=1, le=4)],
-    step_ordinal: Annotated[int, Path(ge=1, le=20)],
+    step_ordinal: Annotated[int, Path(ge=1)],
     request: Request,
     database: DatabaseSession,
     principal: Annotated[WatchPrincipal, Depends(require_watch_principal)],

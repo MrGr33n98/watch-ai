@@ -53,11 +53,13 @@ class SqlAlchemySolutionRepository:
             question.problem_type = exercise.problem_type
             question.confidence = exercise.confidence.value
             question.status = (
-                SolutionStatus.READY.value if verified else SolutionStatus.NEEDS_REVIEW.value
+                SolutionStatus.READY.value
+                if (verified or result.status is SolutionStatus.READY)
+                else SolutionStatus.NEEDS_REVIEW.value
             )
-            question.verification_status = "verified" if verified else "inconclusive"
-            question.final_answer = result.final_answer if verified else None
-            question.units = result.units if verified else None
+            question.verification_status = "verified" if verified else result.verification_status
+            question.final_answer = result.final_answer
+            question.units = result.units
 
             existing_steps = session.scalars(
                 select(SolutionStepRecord).where(SolutionStepRecord.question_id == question.id)
@@ -66,11 +68,6 @@ class SqlAlchemySolutionRepository:
                 session.delete(step)
             session.flush()
             for domain_step in result.steps:
-                if not verified and domain_step.kind in {
-                    SolutionStepKind.CALCULATION,
-                    SolutionStepKind.RESULT,
-                }:
-                    continue
                 session.add(
                     SolutionStepRecord(
                         id=uuid4(),
